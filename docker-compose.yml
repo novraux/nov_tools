@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: novraux-v2-db
+    environment:
+      POSTGRES_USER: novraux
+      POSTGRES_PASSWORD: novraux_secret
+      POSTGRES_DB: novraux_v2
+    ports:
+      - "5433:5432"        # 5433 to avoid conflict with existing project (5432)
+    volumes:
+      - pgdata_v2:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U novraux -d novraux_v2"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: novraux-v2-backend
+    ports:
+      - "8001:8000"        # 8001 to avoid conflict with existing project (8000)
+    volumes:
+      - ./backend:/app
+    environment:
+      DATABASE_URL: postgresql://novraux:novraux_secret@db:5432/novraux_v2
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  pgdata_v2:
