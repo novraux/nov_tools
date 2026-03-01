@@ -32,6 +32,19 @@ class Niche(Base):
     
     research = relationship("NicheResearch", back_populates="niche", uselist=False)
 
+class Design(Base):
+    __tablename__ = "designs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    niche_keyword = Column(String, nullable=False, index=True)
+    prompt = Column(Text, nullable=False)
+    provider = Column(String, nullable=False)       # dalle / gemini
+    size = Column(String, default="1024x1024")
+    image_b64 = Column(Text, nullable=True)         # base64 PNG fallback (when R2 not configured)
+    image_url = Column(String, nullable=True)       # R2 public URL (preferred)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class NicheResearch(Base):
     __tablename__ = "niche_research"
 

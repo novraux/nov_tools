@@ -1,16 +1,21 @@
-import { Routes, Route, NavLink } from 'react-router-dom'
+import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import { Discover } from './pages/Discover'
 import { Research } from './pages/Research'
 import { Design } from './pages/Design'
 
+import { Holidays } from './pages/Holidays'
+
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
-    isActive
-      ? 'bg-zinc-800 text-zinc-100 font-medium'
-      : 'text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800/50'
+  `flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${isActive
+    ? 'bg-zinc-800 text-zinc-100 font-medium'
+    : 'text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800/50'
   }`
 
 export default function App() {
+  const location = useLocation()
+  const topic = new URLSearchParams(location.search).get('topic')
+  const isStandardActive = location.pathname === '/' && (!topic || topic === 'standard')
+
   return (
     <div className="flex h-screen bg-zinc-950 font-sans">
       {/* Sidebar */}
@@ -28,11 +33,24 @@ export default function App() {
 
         {/* Nav */}
         <nav className="flex flex-col gap-0.5">
-          <NavLink to="/" end className={navClass}>
+          <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+            Discovery
+          </div>
+          <NavLink
+            to="/?topic=standard"
+            className={() => navClass({ isActive: isStandardActive })}
+          >
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
             </svg>
-            Discover
+            Standard Niches
+          </NavLink>
+          <NavLink to="/holidays" className={navClass}>
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.866 8.21 8.21 0 0 0 3 2.48Z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.468 5.99 5.99 0 0 0-1.925 3.547 5.975 5.975 0 0 1-2.133-1.001A3.75 3.75 0 0 0 12 18Z" />
+            </svg>
+            Event Radar
           </NavLink>
           <NavLink to="/research" className={navClass}>
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -44,20 +62,20 @@ export default function App() {
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
             </svg>
-            Design
+            Prompt Studio
           </NavLink>
         </nav>
 
         {/* Footer */}
         <div className="mt-auto px-3">
-          <div className="text-[11px] text-zinc-700">Sprint 1 · Discover</div>
+          <div className="text-[11px] text-zinc-700">Sprint 3 · Prompts</div>
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 overflow-auto">
         <Routes>
           <Route path="/" element={<Discover />} />
+          <Route path="/holidays" element={<Holidays />} />
           <Route path="/research" element={<Research />} />
           <Route path="/design" element={<Design />} />
         </Routes>

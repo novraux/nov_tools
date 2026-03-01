@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from db.database import create_tables
-from routers import discover, research
+from routers import discover, research, design
 
 
 @asynccontextmanager
@@ -23,6 +23,7 @@ app.add_middleware(
 
 app.include_router(discover.router)
 app.include_router(research.router)
+app.include_router(design.router)
 
 
 @app.get("/health")

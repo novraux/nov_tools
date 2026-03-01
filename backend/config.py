@@ -8,6 +8,13 @@ class Settings(BaseSettings):
     GOOGLE_AI_KEY: str = ""       # Gemini — image generation alternative
     ANTHROPIC_API_KEY: str = ""   # Claude — deep analysis (gated, score >= 7 only)
 
+    # Cloudflare R2 — image storage
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_ACCOUNT_ID: str = ""
+    R2_BUCKET_NAME: str = ""
+    R2_ENDPOINT: str = ""
+
     class Config:
         env_file = "../.env"
         extra = "ignore"

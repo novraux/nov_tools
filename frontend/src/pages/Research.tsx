@@ -1,7 +1,181 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { api, NicheResearch } from '../api'
+import { api, NicheResearch, SeoResult } from '../api'
 
+// ─── Mini copy button ────────────────────────────────────────────────────────
+function CopyBtn({ text, label = 'Copy' }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+  }
+  return (
+    <button
+      onClick={copy}
+      className={`text-[11px] font-medium px-2 py-1 rounded border transition-colors shrink-0 ${
+        copied
+          ? 'text-emerald-400 border-emerald-900/60 bg-emerald-950/30'
+          : 'text-zinc-500 border-zinc-700 hover:text-zinc-300 hover:border-zinc-600'
+      }`}
+    >
+      {copied ? '✓ Copied' : label}
+    </button>
+  )
+}
+
+// ─── SEO Panel ───────────────────────────────────────────────────────────────
+function SeoPanel({
+  keyword,
+  products,
+  designAngles,
+}: {
+  keyword: string
+  products: string[]
+  designAngles: string[]
+}) {
+  const [seo, setSeo] = useState<SeoResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
+
+  const generate = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.generateSeo({ keyword, products, design_angles: designAngles })
+      setSeo(data.seo)
+      setOpen(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'SEO generation failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+      {/* Header row */}
+      <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🏷️</span>
+          <div>
+            <h3 className="text-zinc-100 font-medium tracking-tight">Etsy + Shopify SEO Copy</h3>
+            <p className="text-zinc-600 text-xs">Title · 13 tags · description · meta — ready to paste</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {seo && (
+            <button
+              onClick={() => setOpen(o => !o)}
+              className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded border border-zinc-800 hover:border-zinc-700 transition-colors"
+            >
+              {open ? 'Collapse' : 'Expand'}
+            </button>
+          )}
+          <button
+            onClick={generate}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors"
+          >
+            {loading ? (
+              <>
+                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>{seo ? '↻ Regenerate SEO' : '✦ Generate SEO Copy'}</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mx-6 mb-4 px-3 py-2 bg-red-950/40 border border-red-900/60 text-red-400 text-xs rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {seo && open && (
+        <div className="px-6 pb-6 space-y-4 border-t border-zinc-800 pt-4">
+          {/* Primary keyword */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider w-28 shrink-0">Primary KW</span>
+            <span className="text-sm text-indigo-300 font-medium flex-1">{seo.primary_keyword}</span>
+          </div>
+
+          {/* Etsy title */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Etsy Title</span>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] ${seo.etsy_title.length > 130 ? 'text-amber-400' : 'text-zinc-600'}`}>
+                  {seo.etsy_title.length}/140
+                </span>
+                <CopyBtn text={seo.etsy_title} />
+              </div>
+            </div>
+            <p className="text-sm text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 leading-relaxed">
+              {seo.etsy_title}
+            </p>
+          </div>
+
+          {/* Etsy tags */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                Etsy Tags <span className="normal-case font-normal text-zinc-600">({seo.etsy_tags.length}/13)</span>
+              </span>
+              <CopyBtn text={seo.etsy_tags.join(', ')} label="Copy all tags" />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {seo.etsy_tags.map((tag, i) => (
+                <button
+                  key={i}
+                  onClick={() => navigator.clipboard.writeText(tag)}
+                  title={`${tag.length}/20 chars — click to copy`}
+                  className="text-xs px-2.5 py-1 bg-zinc-950 border border-zinc-700 hover:border-indigo-600/50 text-zinc-400 hover:text-zinc-200 rounded-full transition-colors"
+                >
+                  {tag}
+                  <span className="text-zinc-700 ml-1">{tag.length}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Etsy description */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Etsy Description (hook)</span>
+              <CopyBtn text={seo.etsy_description} />
+            </div>
+            <p className="text-sm text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 leading-relaxed">
+              {seo.etsy_description}
+            </p>
+          </div>
+
+          {/* Shopify meta */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Shopify Meta Description</span>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] ${seo.shopify_meta.length > 145 ? 'text-amber-400' : 'text-zinc-600'}`}>
+                  {seo.shopify_meta.length}/155
+                </span>
+                <CopyBtn text={seo.shopify_meta} />
+              </div>
+            </div>
+            <p className="text-sm text-zinc-400 bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 leading-relaxed italic">
+              {seo.shopify_meta}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Research page ───────────────────────────────────────────────────────
 export function Research() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -15,12 +189,12 @@ export function Research() {
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Only load from DB when we have a niche ID (coming from Discover)
   const loadResearch = useCallback(async () => {
     if (!nicheId) {
       setLoading(false)
       return
     }
-
     try {
       const data = await api.getResearch(nicheId)
       setResearch(data.research)
@@ -36,12 +210,15 @@ export function Research() {
   }, [loadResearch])
 
   const runAnalysis = async () => {
-    if (!nicheId) return
-
     setAnalyzing(true)
     setError(null)
     try {
-      const data = await api.runResearch(nicheId)
+      let data: { success: boolean; research: NicheResearch }
+      if (nicheId) {
+        data = await api.runResearch(nicheId)
+      } else {
+        data = await api.runResearchByKeyword(nicheKeyword)
+      }
       setResearch(data.research)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Analysis failed')
@@ -50,14 +227,11 @@ export function Research() {
     }
   }
 
-  if (!nicheId || !nicheKeyword) {
+  if (!nicheKeyword) {
     return (
       <div className="p-8 max-w-4xl mx-auto text-center">
         <p className="text-zinc-500 mb-4">No niche selected for research.</p>
-        <button
-          onClick={() => navigate('/')}
-          className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 transition"
-        >
+        <button onClick={() => navigate('/')} className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 transition">
           Back to Discover
         </button>
       </div>
@@ -66,24 +240,23 @@ export function Research() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
+      {/* Header */}
       <div className="mb-8 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">Niche Research</h1>
-            <span className="text-xs text-indigo-400 bg-indigo-950/50 border border-indigo-900/50 px-2 py-0.5 rounded-full">Sprint 2</span>
+            <span className="text-xs text-indigo-400 bg-indigo-950/50 border border-indigo-900/50 px-2 py-0.5 rounded-full">
+              {nicheId ? 'Sprint 2' : 'Event Radar'}
+            </span>
           </div>
-          <p className="text-zinc-500 text-sm">Deep AI analysis — competition, demand, design angles</p>
+          <p className="text-zinc-500 text-sm">Deep AI analysis — competition, demand, design angles + Etsy SEO copy</p>
         </div>
-
-        <button
-          onClick={() => navigate('/')}
-          className="text-sm text-zinc-400 hover:text-zinc-300"
-        >
+        <button onClick={() => navigate(-1)} className="text-sm text-zinc-400 hover:text-zinc-300">
           ← Back
         </button>
       </div>
 
-      {/* Selected Niche Header */}
+      {/* Niche header + run button */}
       <div className="mb-6 px-5 py-4 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <span className="text-2xl">🎯</span>
@@ -130,42 +303,34 @@ export function Research() {
         </div>
       ) : research ? (
         <div className="space-y-6">
-          {/* Verdict Badge */}
-          <div className={`p-6 rounded-xl border flex flex-col items-center justify-center text-center ${research.worth_it
-            ? 'bg-emerald-950/20 border-emerald-900/40 shadow-[0_0_30px_-5px_var(--tw-shadow-color)] shadow-emerald-500/10'
-            : 'bg-red-950/20 border-red-900/40 shadow-[0_0_30px_-5px_var(--tw-shadow-color)] shadow-red-500/10'
-            }`}>
-            <span className={`text-sm font-semibold tracking-wide uppercase mb-1 ${research.worth_it ? 'text-emerald-500' : 'text-red-500'
-              }`}>
+          {/* Verdict */}
+          <div className={`p-6 rounded-xl border flex flex-col items-center justify-center text-center ${
+            research.worth_it
+              ? 'bg-emerald-950/20 border-emerald-900/40 shadow-[0_0_30px_-5px_var(--tw-shadow-color)] shadow-emerald-500/10'
+              : 'bg-red-950/20 border-red-900/40 shadow-[0_0_30px_-5px_var(--tw-shadow-color)] shadow-red-500/10'
+          }`}>
+            <span className={`text-sm font-semibold tracking-wide uppercase mb-1 ${research.worth_it ? 'text-emerald-500' : 'text-red-500'}`}>
               AI Verdict
             </span>
-            <h3 className={`text-4xl font-bold ${research.worth_it ? 'text-emerald-400' : 'text-red-400'
-              }`}>
+            <h3 className={`text-4xl font-bold ${research.worth_it ? 'text-emerald-400' : 'text-red-400'}`}>
               {research.worth_it ? 'Worth It ✅' : 'Skip It ❌'}
             </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Target Audience */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-lg">👥</span>
                 <h3 className="text-zinc-200 font-medium tracking-tight">Target Audience</h3>
               </div>
-              <p className="text-zinc-400 text-sm leading-relaxed">
-                {research.target_audience}
-              </p>
+              <p className="text-zinc-400 text-sm leading-relaxed">{research.target_audience}</p>
             </div>
-
-            {/* Competitor Insights */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-lg">⚔️</span>
                 <h3 className="text-zinc-200 font-medium tracking-tight">Competitor Insights</h3>
               </div>
-              <p className="text-zinc-400 text-sm leading-relaxed">
-                {research.competitor_insights}
-              </p>
+              <p className="text-zinc-400 text-sm leading-relaxed">{research.competitor_insights}</p>
             </div>
           </div>
 
@@ -188,23 +353,40 @@ export function Research() {
               <p className="text-zinc-500 text-sm">No design angles generated.</p>
             )}
 
-            <div className="mt-8 pt-6 border-t border-zinc-800 flex justify-end">
-              <button
-                onClick={() => navigate('/design')}
-                disabled={!research.design_angles.length}
-                className="flex items-center gap-2 px-5 py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold rounded-lg transition-colors"
-              >
-                Go to Design Studio →
-              </button>
+            <div className="mt-8 pt-6 border-t border-zinc-800">
+              <p className="text-xs text-zinc-600 mb-3">Click an angle → Prompt Studio → Kittl-ready prompts</p>
+              <div className="flex flex-wrap gap-2">
+                {research.design_angles.map((angle, i) => (
+                  <button
+                    key={i}
+                    onClick={() => navigate(`/design?niche=${encodeURIComponent(nicheKeyword)}&angle=${encodeURIComponent(angle)}`)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-indigo-600/20 hover:border-indigo-600/40 border border-zinc-700 text-zinc-300 text-xs rounded-lg transition-colors"
+                  >
+                    <span className="text-indigo-500 font-bold">{i + 1}</span>
+                    <span className="truncate max-w-[200px]">{angle}</span>
+                    <svg className="w-3 h-3 text-zinc-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
+          {/* SEO Panel — only shown after research is done */}
+          <SeoPanel
+            keyword={nicheKeyword}
+            products={[]}
+            designAngles={research.design_angles}
+          />
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center h-48 border border-dashed border-zinc-800 rounded-xl gap-2">
           <div className="text-3xl opacity-30">🔬</div>
           <p className="text-zinc-400 text-sm">Ready for Deep Analysis.</p>
-          <p className="text-zinc-600 text-xs">Click <span className="text-zinc-400">Run Deep Analysis</span> to let Claude evaluate <b className="font-semibold">{nicheKeyword}</b>.</p>
+          <p className="text-zinc-600 text-xs">
+            Click <span className="text-zinc-400">Run Deep Analysis</span> to let Claude evaluate <b className="font-semibold">{nicheKeyword}</b>.
+          </p>
         </div>
       )}
     </div>

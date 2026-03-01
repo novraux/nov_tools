@@ -7,16 +7,23 @@ from config import settings
 client = Groq(api_key=settings.AI_API_KEY)
 MODEL = "llama-3.1-8b-instant"
 
-def generate_pod_niches() -> list[dict]:
+def generate_pod_niches(topic: str = "standard") -> list[dict]:
     """
     Brainstorms 15 highly specific, currently trending Print-on-Demand design phrases or micro-niches.
     Examples: "introvert reading club", "retro national park poster", "sarcastic cat mom mug".
     Returns a list of dictionaries with keyword and source.
     """
-    prompt = """You are an expert Print-on-Demand product researcher.
+    
+    if topic.lower() == "standard":
+        topic_instruction = "Focus on evergreen micro-niches (e.g., professions, hobbies, sarcastic quotes, specific lifestyles)."
+    else:
+        topic_instruction = f"Focus strictly on highly relevant, trending concepts for the upcoming holiday/event: {topic}."
+
+    prompt = f"""You are an expert Print-on-Demand product researcher.
     Brainstorm 15 highly specific, highly creative micro-niches or design phrases that would sell exceptionally well right now on Etsy or Redbubble.
     
     CRITICAL:
+    - {topic_instruction}
     - NO broad niches like "cat lover" or "fitness". 
     - INSTEAD provide specific design styles or sayings like "retro sarcastic cat mom tee", "vintage botanicals mug", "introverted book club sweatshirt".
     - MUST be physical items (apparel, mugs, posters).
@@ -44,7 +51,7 @@ def generate_pod_niches() -> list[dict]:
         return [
             {
                 "keyword": phrase,
-                "source": "groq",
+                "source": f"groq_{topic}",
                 "velocity": "rising",
                 "avg_interest": 80
             }

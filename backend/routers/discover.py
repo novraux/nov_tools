@@ -51,12 +51,18 @@ def list_niches(db: Session = Depends(get_db)):
     return {"success": True, "count": len(niches), "niches": [niche_to_dict(n) for n in niches]}
 
 
+from pydantic import BaseModel
+
+class ScrapeRequest(BaseModel):
+    topic: str = "standard"
+
+
 @router.post("/scrape")
-def run_scrape(db: Session = Depends(get_db)):
+def run_scrape(req: ScrapeRequest, db: Session = Depends(get_db)):
     """
     Intelligently generate hyper-specific POD niches and score with Groq. Saves to DB.
     """
-    raw_keywords = generate_pod_niches()
+    raw_keywords = generate_pod_niches(topic=req.topic)
     saved, updated, skipped = 0, 0, 0
 
     for item in raw_keywords:
@@ -89,7 +95,7 @@ def run_scrape(db: Session = Depends(get_db)):
         else:
             db.add(Niche(
                 keyword=kw,
-                source=item.get("source", "groq"),
+                source=item.get("source"),
                 score=scored["score"],
                 pod_viability=scored.get("pod_viability"),
                 competition=scored.get("competition"),

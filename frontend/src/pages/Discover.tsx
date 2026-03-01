@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, Niche } from '../api'
 
 export function Discover() {
-  const [niches, setNiches] = useState<Niche[]>([])
+  const [searchParams] = useSearchParams()
+  const topic = searchParams.get('topic') || 'standard'
+
+  const [allNiches, setAllNiches] = useState<Niche[]>([])
   const [loading, setLoading] = useState(true)
   const [scraping, setScraping] = useState(false)
   const [scrapeResult, setScrapeResult] = useState<{ saved: number; updated: number; skipped: number } | null>(null)
@@ -13,7 +16,7 @@ export function Discover() {
   const load = useCallback(async () => {
     try {
       const data = await api.listNiches()
-      setNiches(data.niches)
+      setAllNiches(data.niches)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load niches')
     } finally {
@@ -28,7 +31,7 @@ export function Discover() {
     setError(null)
     setScrapeResult(null)
     try {
-      const result = await api.runScrape()
+      const result = await api.runScrape(topic)
       setScrapeResult({ saved: result.saved, updated: result.updated, skipped: result.skipped })
       await load()
     } catch (e) {
@@ -41,11 +44,14 @@ export function Discover() {
   const archiveNiche = async (id: number) => {
     try {
       await api.archiveNiche(id)
-      setNiches(prev => prev.filter(n => n.id !== id))
+      setAllNiches(prev => prev.filter(n => n.id !== id))
     } catch {
       // silently ignore archive errors
     }
   }
+
+  // Filter based on active topic view
+  const niches = allNiches.filter(n => n.source.includes(topic))
 
   const rising = niches.filter(n => n.velocity === 'rising').length
   const highScore = niches.filter(n => n.score >= 7).length
@@ -56,7 +62,7 @@ export function Discover() {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">Niche Discovery</h1>
+          <h1 className="text-xl font-semibold text-zinc-100 tracking-tight capitalize">{topic} Niche Discovery</h1>
           <p className="text-zinc-500 text-sm mt-1">
             Google Trends → Groq scoring → ranked POD opportunities
           </p>
