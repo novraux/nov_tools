@@ -8,6 +8,7 @@ from services.image_generator import generate_dalle, generate_gemini
 from services.r2 import upload_image_b64
 from services.prompt_generator import generate_kittl_prompts
 from services.style_analyzer import analyze_style
+from services.kittl_flows import generate_flows
 
 router = APIRouter(prefix="/design", tags=["Design"])
 
@@ -29,6 +30,29 @@ class PromptRequest(BaseModel):
 class StyleAnalysisRequest(BaseModel):
     image_b64: str          # base64-encoded image, no data URI prefix
     mime_type: str = "image/jpeg"
+
+
+class KittlFlowsRequest(BaseModel):
+    niche: str
+    angle: str
+    product: str = "t-shirt"
+
+
+@router.post("/kittl-flows")
+def generate_kittl_flows(req: KittlFlowsRequest):
+    """Generate a base prompt + 10 audience-variant Kittl prompts."""
+    if not req.niche.strip() or not req.angle.strip():
+        raise HTTPException(status_code=400, detail="niche and angle are required")
+    result = generate_flows(req.niche, req.angle, req.product)
+    if not result or not result.get("variants"):
+        raise HTTPException(status_code=502, detail="Flow generation failed. Please try again.")
+    return {
+        "success": True,
+        "niche": req.niche,
+        "angle": req.angle,
+        "base_prompt": result["base_prompt"],
+        "flows": result["variants"],
+    }
 
 
 @router.post("/analyze-style")

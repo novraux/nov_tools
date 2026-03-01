@@ -90,6 +90,17 @@ export interface ListingEstimate {
   suggested_angle: string
 }
 
+export interface FlowItem {
+  audience: string      // e.g. "Nurse / Medical Worker"
+  emoji: string         // e.g. "🩺"
+  prompt: string
+  style: 'minimalist' | 'vintage' | 'bold' | 'funny' | 'handdrawn'
+  product: string
+  focus: 'text' | 'illustration' | 'mixed'
+  background: 'transparent' | 'white'
+  kittl_model: string
+}
+
 export interface PromptResult {
   prompt: string
   style: string
@@ -191,6 +202,12 @@ export const api = {
     request<{ success: boolean; competitor: CompetitorResult }>('/research/competitor-check', {
       method: 'POST',
       body: JSON.stringify({ keyword }),
+    }),
+
+  generateFlows: (niche: string, angle: string, product: string) =>
+    request<{ success: boolean; niche: string; angle: string; base_prompt: string; flows: FlowItem[] }>('/design/kittl-flows', {
+      method: 'POST',
+      body: JSON.stringify({ niche, angle, product }),
     }),
 }
 

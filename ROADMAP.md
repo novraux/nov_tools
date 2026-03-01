@@ -44,6 +44,16 @@
 
 ---
 
+## ✅ Sprint 5.5 Complete — Research UX + Kittl Flows
+
+| Feature | Page | Notes |
+|---------|------|-------|
+| **Kittl Flows Generator** | Research | Base prompt + 10 audience-variant prompts (nurse, teacher, mom, athlete...). Product selector (tee/mug/tote/hoodie/poster). Copy button per prompt. |
+| **Design Angles Redesign** | Research | Each angle = card with `✦ Prompts →` (auto-gen on Design page) + `🔄 Flows` toggle |
+| **Session Caching** | Research | SEO, Competitor, Kittl Flows results cached in sessionStorage — survive page navigation |
+
+---
+
 ## Sprint 6 — 🔥 Next Priorities (Validated by Strategy Analysis)
 
 ### 1. Personalized Event Radar `📋 Planned`
@@ -91,6 +101,7 @@
 | Multi-platform copy | Etsy+Shopify+Pinterest+Printify | ✅ Done |
 | Feedback loops | Outcome Tracker | ✅ Done |
 | Shop-level audit | Shop Audit Mode | 💡 Sprint 7 |
+| Batch listing variants | Kittl Flows (base + 10 audience variants) | ✅ Done |
 
 > **Our edge:** AI-first creative pipeline (idea → drill → design → Kittl prompts → SEO). SalesSamurai is data-first. We're differentiated.
 

@@ -1,8 +1,16 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { api, NicheResearch, SeoResult, CompetitorResult, ListingEstimate } from '../api'
+import { api, NicheResearch, SeoResult, CompetitorResult, ListingEstimate, FlowItem } from '../api'
 
 // ─── Competitor Quick-Check Panel ──────────────────────────────────────────────
+
+// sessionStorage helpers (avoids re-calling Groq when navigating away + back)
+function ssGet<T>(key: string): T | null {
+  try { const v = sessionStorage.getItem(key); return v ? JSON.parse(v) : null } catch { return null }
+}
+function ssSet(key: string, val: unknown) {
+  try { sessionStorage.setItem(key, JSON.stringify(val)) } catch { /* quota, ignore */ }
+}
 const GO_CONFIG = {
   go: { label: '✅ Go For It', color: 'text-emerald-400', bg: 'bg-emerald-950/20 border-emerald-900/40' },
   proceed_with_caution: { label: '⚠️ Proceed with Caution', color: 'text-amber-400', bg: 'bg-amber-950/20 border-amber-900/40' },
@@ -17,9 +25,10 @@ const SAT_COLOR: Record<string, string> = {
 }
 
 function CompetitorPanel({ keyword }: { keyword: string }) {
-  const [result, setResult] = useState<CompetitorResult | null>(null)
+  const cacheKey = `competitor_${keyword}`
+  const [result, setResult] = useState<CompetitorResult | null>(() => ssGet(cacheKey))
   const [loading, setLoading] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(!!ssGet(cacheKey))
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
@@ -29,6 +38,7 @@ function CompetitorPanel({ keyword }: { keyword: string }) {
     try {
       const data = await api.checkCompetitor(keyword)
       setResult(data.competitor)
+      ssSet(cacheKey, data.competitor)
       setOpen(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Check failed')
@@ -127,6 +137,194 @@ function CompetitorPanel({ keyword }: { keyword: string }) {
               </div>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Kittl Flows Panel ─────────────────────────────────────────────────────────
+const FOCUS_COLOR: Record<string, string> = {
+  text: 'text-amber-400  border-amber-800/50  bg-amber-950/10',
+  illustration: 'text-indigo-400 border-indigo-800/50 bg-indigo-950/10',
+  mixed: 'text-violet-400 border-violet-800/50 bg-violet-950/10',
+}
+
+type FlowCache = { base_prompt: string; flows: FlowItem[] }
+
+function KittlFlowsPanel({ niche, angle, product }: { niche: string; angle: string; product: string }) {
+  const cacheKey = `flows_${niche}_${angle}_${product}`
+  const cached = ssGet<FlowCache>(cacheKey)
+  const [basePrompt, setBasePrompt] = useState(cached?.base_prompt ?? '')
+  const [flows, setFlows] = useState<FlowItem[]>(cached?.flows ?? [])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const ranOnce = useRef(!!cached)
+
+  useEffect(() => {
+    if (ranOnce.current) return
+    ranOnce.current = true
+    setLoading(true)
+    api.generateFlows(niche, angle, product)
+      .then(d => {
+        setBasePrompt(d.base_prompt)
+        setFlows(d.flows)
+        ssSet(cacheKey, { base_prompt: d.base_prompt, flows: d.flows })
+      })
+      .catch(e => setError(e instanceof Error ? e.message : 'Generation failed'))
+      .finally(() => setLoading(false))
+  }, [niche, angle, product, cacheKey])
+
+  if (loading) return (
+    <div className="flex items-center gap-2 text-xs text-zinc-500 py-3 px-1">
+      <span className="w-3 h-3 border-2 border-zinc-600 border-t-indigo-400 rounded-full animate-spin" />
+      Generating base concept + audience variants for <span className="text-zinc-300 font-medium">{product}</span>...
+    </div>
+  )
+  if (error) return <p className="text-xs text-red-400 py-2">{error}</p>
+  if (!flows.length) return null
+
+  return (
+    <div className="space-y-3 pt-1">
+      {/* Base prompt — the master concept */}
+      {basePrompt && (
+        <div className="bg-indigo-950/20 border border-indigo-800/40 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">🎨</span>
+              <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">Base Design Concept</span>
+            </div>
+            <CopyBtn text={basePrompt} label="Copy base" />
+          </div>
+          <p className="text-sm text-zinc-300 leading-relaxed">{basePrompt}</p>
+          <p className="text-[10px] text-indigo-400/60 mt-2">Paste this into Kittl as your master artboard → then use the variants below for each audience</p>
+        </div>
+      )}
+
+      {/* Audience variants */}
+      <p className="text-[10px] text-zinc-600 uppercase tracking-wider font-semibold">
+        🎯 {flows.length} audience variants · same design, different slogans
+      </p>
+      <div className="grid grid-cols-1 gap-2">
+        {flows.map((f, i) => {
+          const focusCls = FOCUS_COLOR[f.focus] ?? FOCUS_COLOR.mixed
+          return (
+            <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm leading-none">{f.emoji}</span>
+                  <span className="text-xs font-semibold text-zinc-300">{f.audience}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border uppercase tracking-wide ${focusCls}`}>
+                    {f.kittl_model}
+                  </span>
+                  <CopyBtn text={f.prompt} label="Copy" />
+                </div>
+              </div>
+              <p className="text-[11px] text-zinc-400 leading-relaxed">{f.prompt}</p>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-[9px] text-zinc-600 capitalize">{f.style}</span>
+                <span className="text-zinc-800">·</span>
+                <span className="text-[9px] text-zinc-600 capitalize">{f.product}</span>
+                <span className="text-zinc-800">·</span>
+                <span className="text-[9px] text-zinc-600">{f.background} bg</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Angle Card ───────────────────────────────────────────────────────────────
+const PRODUCTS = ['t-shirt', 'mug', 'tote bag', 'hoodie', 'sweatshirt', 'poster']
+
+function AngleCard({ index, angle, niche }: { index: number; angle: string; niche: string }) {
+  const navigate = useNavigate()
+  const [showFlows, setShowFlows] = useState(false)
+  const [product, setProduct] = useState('t-shirt')
+  // Track the product that was last used to trigger flows (so changing product re-generates)
+  const [activeProduct, setActiveProduct] = useState('t-shirt')
+
+  const toggleFlows = () => {
+    if (!showFlows) {
+      setActiveProduct(product)
+      setShowFlows(true)
+    } else {
+      setShowFlows(false)
+    }
+  }
+
+  return (
+    <div className="bg-zinc-950 rounded-xl border border-zinc-800/70 hover:border-zinc-700 transition-colors overflow-hidden">
+      <div className="flex items-start gap-3 p-4">
+        {/* Index badge */}
+        <span className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-indigo-950/60 border border-indigo-800/40 text-indigo-400 text-xs font-bold mt-0.5">
+          {index + 1}
+        </span>
+
+        {/* Angle text */}
+        <p className="text-sm text-zinc-300 leading-relaxed flex-1">{angle}</p>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => navigate(`/design?niche=${encodeURIComponent(niche)}&angle=${encodeURIComponent(angle)}`)}
+            title="Auto-generate 5 Kittl prompts in Prompt Studio"
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-600/30 text-indigo-300 text-[11px] font-semibold rounded-lg transition-colors"
+          >
+            ✦ Prompts
+            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+            </svg>
+          </button>
+          <button
+            onClick={toggleFlows}
+            title="Audience-targeted Kittl Flows"
+            className={`flex items-center gap-1 px-2.5 py-1.5 border text-[11px] font-semibold rounded-lg transition-colors ${showFlows
+              ? 'bg-emerald-600/20 border-emerald-600/30 text-emerald-300'
+              : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600'
+              }`}
+          >
+            🔄 Flows
+          </button>
+        </div>
+      </div>
+
+      {/* Product selector + Flows panel */}
+      {showFlows && (
+        <div className="border-t border-zinc-800 px-4 pb-4 pt-3">
+          {/* Product type selector */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[10px] text-zinc-600 uppercase tracking-wider font-semibold shrink-0">Product:</span>
+            <div className="flex flex-wrap gap-1">
+              {PRODUCTS.map(p => (
+                <button
+                  key={p}
+                  onClick={() => setProduct(p)}
+                  className={`text-[10px] px-2 py-0.5 rounded border capitalize transition-colors ${product === p
+                    ? 'bg-indigo-600/20 border-indigo-600/40 text-indigo-300'
+                    : 'bg-zinc-900 border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600'
+                    }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            {product !== activeProduct && (
+              <button
+                onClick={() => setActiveProduct(product)}
+                className="text-[10px] px-2 py-0.5 bg-emerald-700/30 border border-emerald-700/40 text-emerald-400 rounded transition-colors hover:bg-emerald-700/50"
+              >
+                ↻ Regenerate
+              </button>
+            )}
+          </div>
+
+          {/* Flows panel — re-mounts when activeProduct changes because key changes */}
+          <KittlFlowsPanel key={`${niche}_${angle}_${activeProduct}`} niche={niche} angle={angle} product={activeProduct} />
         </div>
       )}
     </div>
@@ -346,18 +544,17 @@ function CopyBtn({ text, label = 'Copy' }: { text: string; label?: string }) {
 
 // ─── SEO Panel ───────────────────────────────────────────────────────────────
 function SeoPanel({
-  keyword,
-  products,
-  designAngles,
+  keyword, products, designAngles,
 }: {
   keyword: string
   products: string[]
   designAngles: string[]
 }) {
-  const [seo, setSeo] = useState<SeoResult | null>(null)
+  const cacheKey = `seo_${keyword}`
+  const [seo, setSeo] = useState<SeoResult | null>(() => ssGet(cacheKey))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(!!ssGet(cacheKey))
 
   const generate = async () => {
     setLoading(true)
@@ -365,6 +562,7 @@ function SeoPanel({
     try {
       const data = await api.generateSeo({ keyword, products, design_angles: designAngles })
       setSeo(data.seo)
+      ssSet(cacheKey, data.seo)
       setOpen(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'SEO generation failed')
@@ -685,41 +883,23 @@ export function Research() {
 
           {/* Design Angles */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-1">
               <span className="text-xl">🎨</span>
-              <h3 className="text-zinc-100 font-medium tracking-tight">Creative Design Angles</h3>
-            </div>
-            {research.design_angles.length > 0 ? (
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {research.design_angles.map((angle, i) => (
-                  <li key={i} className="flex flex-col gap-1.5 p-4 bg-zinc-950 rounded-lg border border-zinc-800/70 hover:border-indigo-500/30 transition-colors">
-                    <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Angle {i + 1}</span>
-                    <span className="text-sm text-zinc-300 leading-relaxed">{angle}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-zinc-500 text-sm">No design angles generated.</p>
-            )}
-
-            <div className="mt-8 pt-6 border-t border-zinc-800">
-              <p className="text-xs text-zinc-600 mb-3">Click an angle → Prompt Studio → Kittl-ready prompts</p>
-              <div className="flex flex-wrap gap-2">
-                {research.design_angles.map((angle, i) => (
-                  <button
-                    key={i}
-                    onClick={() => navigate(`/design?niche=${encodeURIComponent(nicheKeyword)}&angle=${encodeURIComponent(angle)}`)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-indigo-600/20 hover:border-indigo-600/40 border border-zinc-700 text-zinc-300 text-xs rounded-lg transition-colors"
-                  >
-                    <span className="text-indigo-500 font-bold">{i + 1}</span>
-                    <span className="truncate max-w-[200px]">{angle}</span>
-                    <svg className="w-3 h-3 text-zinc-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                    </svg>
-                  </button>
-                ))}
+              <div>
+                <h3 className="text-zinc-100 font-medium tracking-tight">Creative Design Angles</h3>
+                <p className="text-zinc-600 text-xs mt-0.5">Click <span className="text-indigo-400">✦ Prompts</span> to auto-generate Kittl prompts · <span className="text-emerald-400">🔄 Flows</span> for 10 seasonal variants</p>
               </div>
             </div>
+
+            {research.design_angles.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                {research.design_angles.map((angle, i) => (
+                  <AngleCard key={i} index={i} angle={angle} niche={nicheKeyword} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-zinc-500 text-sm mt-4">No design angles generated.</p>
+            )}
           </div>
 
           {/* Competitor Quick-Check — shown after research is done */}
