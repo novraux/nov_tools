@@ -111,6 +111,8 @@ def run_scrape(req: ScrapeRequest, db: Session = Depends(get_db)):
             existing.product_ideas = scored.get("product_ideas", [])
             existing.scraped_at = now
             updated += 1
+            niche_obj = existing
+        else:
             new_niche = Niche(
                 keyword=kw,
                 source=item.get("source"),

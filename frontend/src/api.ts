@@ -97,13 +97,14 @@ export interface ListingEstimate {
 }
 
 export interface FlowItem {
-  audience: string      // e.g. "Nurse / Medical Worker"
+  audience: string      // e.g. "ICU Night Shift Nurse"
   emoji: string         // e.g. "🩺"
-  prompt: string
+  slogan: string        // the hero text for this variant
+  caption: string       // the small supporting line
+  prompt: string        // short Kittl Flows modification prompt
   style: 'minimalist' | 'vintage' | 'bold' | 'funny' | 'handdrawn'
   product: string
   focus: 'text' | 'illustration' | 'mixed'
-  background: 'transparent' | 'white'
   kittl_model: string
 }
 

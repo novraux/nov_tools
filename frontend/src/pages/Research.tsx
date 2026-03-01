@@ -161,10 +161,12 @@ function KittlFlowsPanel({ niche, angle, product }: { niche: string; angle: stri
   const [error, setError] = useState<string | null>(null)
   const ranOnce = useRef(!!cached)
 
-  useEffect(() => {
-    if (ranOnce.current) return
-    ranOnce.current = true
+  const run = (force = false) => {
+    if (force) {
+      try { sessionStorage.removeItem(cacheKey) } catch { /* ignore */ }
+    }
     setLoading(true)
+    setError(null)
     api.generateFlows(niche, angle, product)
       .then(d => {
         setBasePrompt(d.base_prompt)
@@ -173,6 +175,13 @@ function KittlFlowsPanel({ niche, angle, product }: { niche: string; angle: stri
       })
       .catch(e => setError(e instanceof Error ? e.message : 'Generation failed'))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    if (ranOnce.current) return
+    ranOnce.current = true
+    run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [niche, angle, product, cacheKey])
 
   if (loading) return (
@@ -186,31 +195,53 @@ function KittlFlowsPanel({ niche, angle, product }: { niche: string; angle: stri
 
   return (
     <div className="space-y-3 pt-1">
-      {/* Base prompt — the master concept */}
+      {/* How Kittl Flows works */}
+      <div className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-[10px] text-zinc-500 leading-relaxed">
+        <span className="text-zinc-400 font-semibold">How to use:</span>{' '}
+        Paste the <span className="text-indigo-300">base prompt</span> into your first Kittl AI Image board to generate the master design.
+        Then add connected AI Image boards for each variant — paste the <span className="text-emerald-300">short variant prompt</span> into each.
+        Kittl sees the parent design visually, so variants stay consistent.
+      </div>
+
+      {/* Step 1 — Base prompt */}
       {basePrompt && (
         <div className="bg-indigo-950/20 border border-indigo-800/40 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm">🎨</span>
-              <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">Base Design Concept</span>
+              <span className="text-[10px] font-bold text-indigo-400 bg-indigo-950/60 border border-indigo-800/50 px-1.5 py-0.5 rounded">STEP 1</span>
+              <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">Base Design Prompt</span>
             </div>
-            <CopyBtn text={basePrompt} label="Copy base" />
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => run(true)}
+                title="Clear cache and regenerate fresh prompts"
+                className="text-[10px] px-2 py-1 rounded border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors"
+              >
+                ↻ Regenerate
+              </button>
+              <CopyBtn text={basePrompt} label="Copy" />
+            </div>
           </div>
           <p className="text-sm text-zinc-300 leading-relaxed">{basePrompt}</p>
-          <p className="text-[10px] text-indigo-400/60 mt-2">Paste this into Kittl as your master artboard → then use the variants below for each audience</p>
+          <p className="text-[10px] text-indigo-400/60 mt-2">
+            Paste into Kittl AI → generates your master artboard → use AI Background Remover after
+          </p>
         </div>
       )}
 
-      {/* Audience variants */}
-      <p className="text-[10px] text-zinc-600 uppercase tracking-wider font-semibold">
-        🎯 {flows.length} audience variants · same design, different slogans
-      </p>
+      {/* Step 2 — Audience variants */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-1.5 py-0.5 rounded">STEP 2</span>
+        <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
+          {flows.length} audience variants — connect to base, paste prompt, Kittl keeps the same design
+        </p>
+      </div>
       <div className="grid grid-cols-1 gap-2">
         {flows.map((f, i) => {
           const focusCls = FOCUS_COLOR[f.focus] ?? FOCUS_COLOR.mixed
           return (
             <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm leading-none">{f.emoji}</span>
                   <span className="text-xs font-semibold text-zinc-300">{f.audience}</span>
@@ -222,12 +253,14 @@ function KittlFlowsPanel({ niche, angle, product }: { niche: string; angle: stri
                   <CopyBtn text={f.prompt} label="Copy" />
                 </div>
               </div>
-              <p className="text-[11px] text-zinc-400 leading-relaxed">{f.prompt}</p>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-[9px] text-zinc-600 capitalize">{f.style}</span>
-                <span className="text-zinc-800">·</span>
-                <span className="text-[9px] text-zinc-600 capitalize">{f.product}</span>
-              </div>
+              {/* Slogan highlight */}
+              {f.slogan && (
+                <p className="text-xs text-emerald-300 font-medium mb-1">"{f.slogan}"
+                  {f.caption && <span className="text-zinc-500 font-normal"> · {f.caption}</span>}
+                </p>
+              )}
+              {/* Short variant prompt */}
+              <p className="text-[11px] text-zinc-500 leading-relaxed italic">{f.prompt}</p>
             </div>
           )
         })}
