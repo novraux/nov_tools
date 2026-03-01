@@ -33,6 +33,8 @@ export interface NicheResearch {
   target_audience: string
   competitor_insights: string
   design_angles: string[]
+  outcome: 'testing' | 'sold' | 'flopped' | 'not_listed' | null
+  outcome_notes: string | null
   created_at: string | null
 }
 
@@ -41,7 +43,51 @@ export interface SeoResult {
   etsy_tags: string[]
   etsy_description: string
   shopify_meta: string
+  pinterest_description: string
+  printify_description: string
   primary_keyword: string
+}
+
+export interface StyleAnalysis {
+  style_tags: string[]
+  color_palette: string[]
+  mood: string
+  design_type: string
+  kittl_model: string
+  keywords: string[]
+  replication_prompt: string
+}
+
+export interface CompetitorResult {
+  saturation_level: 'low' | 'medium' | 'high' | 'very_high'
+  saturation_score: number
+  go_no_go: 'go' | 'proceed_with_caution' | 'no_go'
+  reasoning: string
+  top_buyer_queries: string[]
+  winning_angle: string
+  avg_price_range: string
+  best_products: string[]
+}
+
+export interface SubNiche {
+  keyword: string
+  score: number
+  competition: 'low' | 'medium' | 'high'
+  product_fit: string
+  hook: string
+}
+
+export interface ListingEstimate {
+  listing_title: string
+  niche: string
+  sales_tier: 'low' | 'medium' | 'high' | 'top_seller'
+  estimated_monthly_sales: string
+  price_positioning: string
+  review_velocity: string
+  competition_verdict: 'easy_entry' | 'moderate_competition' | 'tough_market' | 'avoid'
+  enter_niche: boolean
+  reasoning: string
+  suggested_angle: string
 }
 
 export interface PromptResult {
@@ -81,6 +127,12 @@ export const api = {
   archiveNiche: (id: number) =>
     request<{ success: boolean }>(`/discover/${id}`, { method: 'DELETE' }),
 
+  drillNiche: (keyword: string) =>
+    request<{ success: boolean; keyword: string; sub_niches: SubNiche[] }>('/discover/drill', {
+      method: 'POST',
+      body: JSON.stringify({ keyword }),
+    }),
+
   getResearch: (nicheId: number) =>
     request<{ success: boolean; research: NicheResearch | null }>(`/research/${nicheId}`),
 
@@ -111,8 +163,34 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+
   listDesigns: (niche?: string) =>
     request<{ success: boolean; count: number; designs: Design[] }>(
       niche ? `/design/list?niche=${encodeURIComponent(niche)}` : '/design/list'
     ),
+
+  estimateListing: (url: string) =>
+    request<{ success: boolean; estimate: ListingEstimate }>('/research/listing-estimate', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    }),
+
+  updateOutcome: (nicheId: number, outcome: string, notes?: string) =>
+    request<{ success: boolean; research: NicheResearch }>(`/research/${nicheId}/outcome`, {
+      method: 'PATCH',
+      body: JSON.stringify({ outcome, notes: notes ?? '' }),
+    }),
+
+  analyzeStyle: (body: { image_b64: string; mime_type?: string }) =>
+    request<{ success: boolean; analysis: StyleAnalysis }>('/design/analyze-style', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  checkCompetitor: (keyword: string) =>
+    request<{ success: boolean; competitor: CompetitorResult }>('/research/competitor-check', {
+      method: 'POST',
+      body: JSON.stringify({ keyword }),
+    }),
 }
+

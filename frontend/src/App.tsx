@@ -68,7 +68,7 @@ export default function App() {
 
         {/* Footer */}
         <div className="mt-auto px-3">
-          <div className="text-[11px] text-zinc-700">Sprint 3 · Prompts</div>
+          <div className="text-[11px] text-zinc-700">Sprint 4 · Sub-niches</div>
         </div>
       </aside>
 

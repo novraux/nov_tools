@@ -1,6 +1,327 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { api, NicheResearch, SeoResult } from '../api'
+import { api, NicheResearch, SeoResult, CompetitorResult, ListingEstimate } from '../api'
+
+// ─── Competitor Quick-Check Panel ──────────────────────────────────────────────
+const GO_CONFIG = {
+  go: { label: '✅ Go For It', color: 'text-emerald-400', bg: 'bg-emerald-950/20 border-emerald-900/40' },
+  proceed_with_caution: { label: '⚠️ Proceed with Caution', color: 'text-amber-400', bg: 'bg-amber-950/20 border-amber-900/40' },
+  no_go: { label: '❌ No-Go', color: 'text-red-400', bg: 'bg-red-950/20 border-red-900/40' },
+}
+
+const SAT_COLOR: Record<string, string> = {
+  low: 'text-emerald-400',
+  medium: 'text-amber-400',
+  high: 'text-red-400',
+  very_high: 'text-red-500',
+}
+
+function CompetitorPanel({ keyword }: { keyword: string }) {
+  const [result, setResult] = useState<CompetitorResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const navigate = useNavigate()
+
+  const run = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.checkCompetitor(keyword)
+      setResult(data.competitor)
+      setOpen(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Check failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const cfg = result ? GO_CONFIG[result.go_no_go] : null
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+      <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">⚡</span>
+          <div>
+            <h3 className="text-zinc-100 font-medium tracking-tight">Competitor Quick-Check</h3>
+            <p className="text-zinc-600 text-xs">Saturation · buyer queries · winning angle · price range</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {result && (
+            <button
+              onClick={() => setOpen(o => !o)}
+              className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded border border-zinc-800 hover:border-zinc-700 transition-colors"
+            >
+              {open ? 'Collapse' : 'Expand'}
+            </button>
+          )}
+          <button
+            onClick={run}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors"
+          >
+            {loading ? (
+              <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Analyzing...</>
+            ) : (
+              <>{result ? '↻ Re-check' : '⚡ Quick Check'}</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="mx-6 mb-4 px-3 py-2 bg-red-950/40 border border-red-900/60 text-red-400 text-xs rounded-lg">{error}</div>}
+
+      {result && open && (
+        <div className="border-t border-zinc-800 px-6 pb-6 pt-4 space-y-5">
+          {/* Go / No-Go */}
+          <div className={`flex items-center justify-between px-5 py-3 rounded-xl border ${cfg!.bg}`}>
+            <div>
+              <p className={`text-lg font-bold ${cfg!.color}`}>{cfg!.label}</p>
+              <p className="text-zinc-500 text-xs mt-0.5">{result.reasoning}</p>
+            </div>
+            <div className="text-right shrink-0 ml-4">
+              <div className={`text-3xl font-bold tabular-nums ${SAT_COLOR[result.saturation_level]}`}>
+                {result.saturation_score}<span className="text-zinc-600 text-sm">/10</span>
+              </div>
+              <div className={`text-[10px] font-semibold uppercase ${SAT_COLOR[result.saturation_level]}`}>
+                {result.saturation_level.replace('_', ' ')} saturation
+              </div>
+            </div>
+          </div>
+
+          {/* Top buyer queries */}
+          <div>
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Top Buyer Search Queries</p>
+            <div className="space-y-1.5">
+              {result.top_buyer_queries.map((q, i) => (
+                <div key={i} className="flex items-center gap-2 group">
+                  <span className="text-zinc-700 text-xs tabular-nums w-4 shrink-0">{i + 1}.</span>
+                  <span className="text-sm text-zinc-300 flex-1">{q}</span>
+                  <button
+                    onClick={() => navigate(`/research?niche=${encodeURIComponent(q)}`)}
+                    className="text-[10px] text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                  >
+                    Research →
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Winning angle + meta */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+              <p className="text-[11px] text-zinc-600 uppercase tracking-wider font-semibold mb-1">Winning Angle</p>
+              <p className="text-sm text-emerald-300 leading-snug">{result.winning_angle}</p>
+            </div>
+            <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+              <p className="text-[11px] text-zinc-600 uppercase tracking-wider font-semibold mb-1">Avg. Price Range</p>
+              <p className="text-2xl font-bold text-zinc-200">{result.avg_price_range}</p>
+              <div className="flex gap-1 mt-2 flex-wrap">
+                {result.best_products.map((p, i) => (
+                  <span key={i} className="text-[10px] px-1.5 py-0.5 bg-zinc-800 text-zinc-500 rounded">{p}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Outcome Tracker ────────────────────────────────────────────────
+const OUTCOMES = [
+  { value: 'testing', label: '🧪 Testing', desc: 'Listed, tracking results', bg: 'border-blue-700/50 bg-blue-950/20 text-blue-300' },
+  { value: 'sold', label: '💰 Sold!', desc: 'Generated sales', bg: 'border-emerald-700/50 bg-emerald-950/20 text-emerald-300' },
+  { value: 'flopped', label: '💔 Flopped', desc: 'No traction, archived', bg: 'border-red-700/50 bg-red-950/20 text-red-300' },
+  { value: 'not_listed', label: '⏸️ Not Listed', desc: 'Skipped or on hold', bg: 'border-zinc-700/50 bg-zinc-800/20 text-zinc-400' },
+]
+
+function OutcomeTracker({ nicheId, current }: { nicheId: number; current: string | null }) {
+  const [selected, setSelected] = useState<string | null>(current)
+  const [saving, setSaving] = useState(false)
+
+  const choose = async (value: string) => {
+    if (saving) return
+    setSaving(true)
+    try {
+      await api.updateOutcome(nicheId, value)
+      setSelected(value)
+    } catch { /* ignore */ } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-lg">📊</span>
+        <div>
+          <h3 className="text-zinc-100 font-medium tracking-tight text-sm">Niche Outcome Tracker</h3>
+          <p className="text-zinc-600 text-xs">Did this niche work for you? Track your results.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {OUTCOMES.map(o => (
+          <button
+            key={o.value}
+            onClick={() => choose(o.value)}
+            disabled={saving}
+            className={`text-left px-4 py-3 rounded-lg border transition-all ${selected === o.value
+              ? o.bg + ' ring-1 ring-offset-1 ring-offset-zinc-900 ring-indigo-500'
+              : 'border-zinc-800 bg-zinc-950 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
+              }`}
+          >
+            <div className="text-sm font-medium">{o.label}</div>
+            <div className="text-[10px] mt-0.5 opacity-70">{o.desc}</div>
+          </button>
+        ))}
+      </div>
+      {selected && (
+        <p className="text-xs text-zinc-600 mt-3 text-center">
+          Marked as <span className="text-zinc-400 font-medium">{OUTCOMES.find(o => o.value === selected)?.label}</span> · saved automatically
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ─── Listing Estimator Panel ───────────────────────────────────────────────
+const VERDICT_CONFIG = {
+  easy_entry: { label: '✅ Easy Entry', color: 'text-emerald-400', bg: 'bg-emerald-950/20 border-emerald-900/40' },
+  moderate_competition: { label: '⚠️ Moderate Competition', color: 'text-amber-400', bg: 'bg-amber-950/20 border-amber-900/40' },
+  tough_market: { label: '🚨 Tough Market', color: 'text-red-400', bg: 'bg-red-950/20 border-red-900/40' },
+  avoid: { label: '🚫 Avoid', color: 'text-red-500', bg: 'bg-red-950/30 border-red-900/50' },
+}
+
+const TIER_BADGE: Record<string, string> = {
+  low: 'text-zinc-500 border-zinc-700',
+  medium: 'text-amber-400 border-amber-800',
+  high: 'text-indigo-400 border-indigo-800',
+  top_seller: 'text-emerald-400 border-emerald-800',
+}
+
+function ListingEstimatorPanel() {
+  const [url, setUrl] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<ListingEstimate | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
+
+  const run = async () => {
+    if (!url.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.estimateListing(url.trim())
+      setResult(data.estimate)
+      setOpen(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Estimation failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const cfg = result ? VERDICT_CONFIG[result.competition_verdict] : null
+  const tierCls = result ? (TIER_BADGE[result.sales_tier] ?? TIER_BADGE.medium) : ''
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+      <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🔗</span>
+          <div>
+            <h3 className="text-zinc-100 font-medium tracking-tight">Listing URL Estimator</h3>
+            <p className="text-zinc-600 text-xs">Paste a competitor’s Etsy URL → Groq estimates sales tier, price, and whether to enter</p>
+          </div>
+        </div>
+        {result && (
+          <button onClick={() => setOpen(o => !o)} className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded border border-zinc-800 hover:border-zinc-700 transition-colors">
+            {open ? 'Collapse' : 'Expand'}
+          </button>
+        )}
+      </div>
+
+      <div className="px-6 pb-4 flex gap-2">
+        <input
+          type="url"
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && run()}
+          placeholder="https://www.etsy.com/listing/123456789/funny-nurse-mug-coffee-cup..."
+          className="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-2 text-sm text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-indigo-600/60 transition-colors"
+        />
+        <button
+          onClick={run}
+          disabled={loading || !url.trim()}
+          className="flex items-center gap-2 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors shrink-0"
+        >
+          {loading ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : '❤'}
+          {loading ? 'Analyzing...' : 'Estimate'}
+        </button>
+      </div>
+
+      {error && <div className="mx-6 mb-4 px-3 py-2 bg-red-950/40 border border-red-900/60 text-red-400 text-xs rounded-lg">{error}</div>}
+
+      {result && open && (
+        <div className="border-t border-zinc-800 px-6 pb-6 pt-4 space-y-4">
+          {/* Listing title */}
+          <div>
+            <p className="text-xs text-zinc-600 uppercase tracking-wider font-semibold mb-1">Detected Listing</p>
+            <p className="text-zinc-200 text-sm font-medium capitalize">{result.listing_title}</p>
+            <p className="text-zinc-600 text-xs mt-0.5">Niche: <span className="text-zinc-400">{result.niche}</span></p>
+          </div>
+
+          {/* Verdict */}
+          <div className={`flex items-center justify-between px-5 py-3 rounded-xl border ${cfg!.bg}`}>
+            <div>
+              <p className={`text-lg font-bold ${cfg!.color}`}>{cfg!.label}</p>
+              <p className="text-zinc-500 text-xs mt-0.5">{result.reasoning}</p>
+            </div>
+            <div className="text-right shrink-0 ml-4">
+              <div className={`text-xs font-semibold px-2 py-1 rounded border ${tierCls}`}>
+                {result.sales_tier.replace('_', ' ')} sales
+              </div>
+              <div className="text-zinc-500 text-[10px] mt-1">{result.estimated_monthly_sales}</div>
+            </div>
+          </div>
+
+          {/* Stats grid */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Price Range', value: result.price_positioning },
+              { label: 'Review Velocity', value: result.review_velocity },
+              { label: 'Sales Tier', value: result.sales_tier.replace('_', ' ') },
+            ].map(s => (
+              <div key={s.label} className="bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2.5">
+                <p className="text-[10px] text-zinc-600 uppercase tracking-wider font-semibold mb-0.5">{s.label}</p>
+                <p className="text-sm text-zinc-300 capitalize">{s.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Suggested angle */}
+          <div className="bg-zinc-950 border border-emerald-900/30 rounded-lg px-4 py-3">
+            <p className="text-[11px] text-zinc-600 uppercase tracking-wider font-semibold mb-1">🎯 Suggested Winning Angle</p>
+            <p className="text-sm text-emerald-300 leading-snug">{result.suggested_angle}</p>
+            <button
+              onClick={() => navigate(`/research?niche=${encodeURIComponent(result.suggested_angle)}`)}
+              className="mt-2 text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Research this angle →
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Mini copy button ────────────────────────────────────────────────────────
 function CopyBtn({ text, label = 'Copy' }: { text: string; label?: string }) {
@@ -13,11 +334,10 @@ function CopyBtn({ text, label = 'Copy' }: { text: string; label?: string }) {
   return (
     <button
       onClick={copy}
-      className={`text-[11px] font-medium px-2 py-1 rounded border transition-colors shrink-0 ${
-        copied
-          ? 'text-emerald-400 border-emerald-900/60 bg-emerald-950/30'
-          : 'text-zinc-500 border-zinc-700 hover:text-zinc-300 hover:border-zinc-600'
-      }`}
+      className={`text-[11px] font-medium px-2 py-1 rounded border transition-colors shrink-0 ${copied
+        ? 'text-emerald-400 border-emerald-900/60 bg-emerald-950/30'
+        : 'text-zinc-500 border-zinc-700 hover:text-zinc-300 hover:border-zinc-600'
+        }`}
     >
       {copied ? '✓ Copied' : label}
     </button>
@@ -60,8 +380,8 @@ function SeoPanel({
         <div className="flex items-center gap-2">
           <span className="text-lg">🏷️</span>
           <div>
-            <h3 className="text-zinc-100 font-medium tracking-tight">Etsy + Shopify SEO Copy</h3>
-            <p className="text-zinc-600 text-xs">Title · 13 tags · description · meta — ready to paste</p>
+            <h3 className="text-zinc-100 font-medium tracking-tight">Full Listing Copy</h3>
+            <p className="text-zinc-600 text-xs">Etsy · Shopify · Pinterest · Printify — ready to paste</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -169,6 +489,32 @@ function SeoPanel({
               {seo.shopify_meta}
             </p>
           </div>
+
+          {/* Pinterest description */}
+          {seo.pinterest_description && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">📌 Pinterest Pin</span>
+                <CopyBtn text={seo.pinterest_description} />
+              </div>
+              <p className="text-sm text-pink-300/80 bg-zinc-950 border border-pink-900/20 rounded-lg px-4 py-3 leading-relaxed italic">
+                {seo.pinterest_description}
+              </p>
+            </div>
+          )}
+
+          {/* Printify description */}
+          {seo.printify_description && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">🖨️ Printify Product Description</span>
+                <CopyBtn text={seo.printify_description} />
+              </div>
+              <p className="text-sm text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 leading-relaxed">
+                {seo.printify_description}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -246,7 +592,7 @@ export function Research() {
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">Niche Research</h1>
             <span className="text-xs text-indigo-400 bg-indigo-950/50 border border-indigo-900/50 px-2 py-0.5 rounded-full">
-              {nicheId ? 'Sprint 2' : 'Event Radar'}
+              {nicheId ? 'Groq Analysis' : 'Event Radar'}
             </span>
           </div>
           <p className="text-zinc-500 text-sm">Deep AI analysis — competition, demand, design angles + Etsy SEO copy</p>
@@ -266,7 +612,11 @@ export function Research() {
           </div>
         </div>
 
-        {!research && !loading && (
+        {/* Run / Re-analyze button — always show if we have a keyword */}
+        <div className="flex items-center gap-2">
+          {research && (
+            <span className="text-xs text-zinc-600">Last run: {research.created_at ? new Date(research.created_at).toLocaleDateString() : 'just now'}</span>
+          )}
           <button
             onClick={runAnalysis}
             disabled={analyzing}
@@ -275,18 +625,18 @@ export function Research() {
             {analyzing ? (
               <>
                 <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Analyzing (Claude)...
+                Analyzing (Groq)...
               </>
             ) : (
               <>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09l2.846.813-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
                 </svg>
-                Run Deep Analysis
+                {research ? '↻ Re-analyze' : 'Run Deep Analysis'}
               </>
             )}
           </button>
-        )}
+        </div>
       </div>
 
       {error && (
@@ -304,11 +654,10 @@ export function Research() {
       ) : research ? (
         <div className="space-y-6">
           {/* Verdict */}
-          <div className={`p-6 rounded-xl border flex flex-col items-center justify-center text-center ${
-            research.worth_it
-              ? 'bg-emerald-950/20 border-emerald-900/40 shadow-[0_0_30px_-5px_var(--tw-shadow-color)] shadow-emerald-500/10'
-              : 'bg-red-950/20 border-red-900/40 shadow-[0_0_30px_-5px_var(--tw-shadow-color)] shadow-red-500/10'
-          }`}>
+          <div className={`p-6 rounded-xl border flex flex-col items-center justify-center text-center ${research.worth_it
+            ? 'bg-emerald-950/20 border-emerald-900/40 shadow-[0_0_30px_-5px_var(--tw-shadow-color)] shadow-emerald-500/10'
+            : 'bg-red-950/20 border-red-900/40 shadow-[0_0_30px_-5px_var(--tw-shadow-color)] shadow-red-500/10'
+            }`}>
             <span className={`text-sm font-semibold tracking-wide uppercase mb-1 ${research.worth_it ? 'text-emerald-500' : 'text-red-500'}`}>
               AI Verdict
             </span>
@@ -373,6 +722,15 @@ export function Research() {
             </div>
           </div>
 
+          {/* Competitor Quick-Check — shown after research is done */}
+          <CompetitorPanel keyword={nicheKeyword} />
+
+          {/* Listing URL Estimator */}
+          <ListingEstimatorPanel />
+
+          {/* Outcome Tracker */}
+          {nicheId && <OutcomeTracker nicheId={nicheId} current={research?.outcome ?? null} />}
+
           {/* SEO Panel — only shown after research is done */}
           <SeoPanel
             keyword={nicheKeyword}
@@ -385,7 +743,7 @@ export function Research() {
           <div className="text-3xl opacity-30">🔬</div>
           <p className="text-zinc-400 text-sm">Ready for Deep Analysis.</p>
           <p className="text-zinc-600 text-xs">
-            Click <span className="text-zinc-400">Run Deep Analysis</span> to let Claude evaluate <b className="font-semibold">{nicheKeyword}</b>.
+            Click <span className="text-zinc-400">Run Deep Analysis</span> to let Groq evaluate <b className="font-semibold text-zinc-400">{nicheKeyword}</b> for POD potential.
           </p>
         </div>
       )}

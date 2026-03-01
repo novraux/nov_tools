@@ -7,6 +7,7 @@ from db.models import Design
 from services.image_generator import generate_dalle, generate_gemini
 from services.r2 import upload_image_b64
 from services.prompt_generator import generate_kittl_prompts
+from services.style_analyzer import analyze_style
 
 router = APIRouter(prefix="/design", tags=["Design"])
 
@@ -23,6 +24,22 @@ class PromptRequest(BaseModel):
     angle: str = ""
     style: str = "auto"
     count: int = 5
+
+
+class StyleAnalysisRequest(BaseModel):
+    image_b64: str          # base64-encoded image, no data URI prefix
+    mime_type: str = "image/jpeg"
+
+
+@router.post("/analyze-style")
+def analyze_reference_style(req: StyleAnalysisRequest):
+    """Analyze a reference POD image and return style tags, colors, and a replication prompt."""
+    if not req.image_b64:
+        raise HTTPException(status_code=400, detail="image_b64 is required")
+    result = analyze_style(req.image_b64, req.mime_type)
+    if not result:
+        raise HTTPException(status_code=502, detail="Style analysis failed. Please try again.")
+    return {"success": True, "analysis": result}
 
 
 def design_to_dict(d: Design) -> dict:

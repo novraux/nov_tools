@@ -7,12 +7,27 @@ from db.database import get_db
 from db.models import Niche, NicheResearch
 from services.researcher import analyze_niche
 from services.seo_generator import generate_seo
+from services.competitor_checker import check_competitor
+from services.listing_estimator import estimate_listing
 
 router = APIRouter(prefix="/research", tags=["Research"])
 
 
 class KeywordResearchRequest(BaseModel):
     keyword: str
+
+
+class CompetitorCheckRequest(BaseModel):
+    keyword: str
+
+
+class OutcomeRequest(BaseModel):
+    outcome: str   # testing | sold | flopped | not_listed
+    notes: str = ""
+
+
+class ListingEstimateRequest(BaseModel):
+    url: str
 
 
 class SeoRequest(BaseModel):
@@ -28,8 +43,32 @@ def research_to_dict(r: NicheResearch) -> dict:
         "target_audience": r.target_audience,
         "competitor_insights": r.competitor_insights,
         "design_angles": r.design_angles,
+        "outcome": r.outcome,
+        "outcome_notes": r.outcome_notes,
         "created_at": r.created_at.isoformat() if r.created_at else None
     }
+
+@router.post("/listing-estimate")
+def run_listing_estimate(req: ListingEstimateRequest):
+    """Estimate a competitor Etsy listing's performance from its URL (Groq, no scraping)."""
+    if not req.url.strip():
+        raise HTTPException(status_code=400, detail="url is required")
+    result = estimate_listing(req.url)
+    if not result:
+        raise HTTPException(status_code=502, detail="Estimation failed. Please try again.")
+    return {"success": True, "estimate": result}
+
+
+@router.post("/competitor-check")
+def run_competitor_check(req: CompetitorCheckRequest):
+    """Estimate saturation + top buyer queries for a keyword (Groq, free)."""
+    if not req.keyword.strip():
+        raise HTTPException(status_code=400, detail="keyword is required")
+    result = check_competitor(req.keyword)
+    if not result:
+        raise HTTPException(status_code=502, detail="Competitor analysis failed. Please try again.")
+    return {"success": True, "competitor": result}
+
 
 @router.post("/seo")
 def generate_listing_seo(req: SeoRequest):
@@ -102,3 +141,20 @@ def run_niche_research(niche_id: int, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(new_research)
         return {"success": True, "research": research_to_dict(new_research)}
+
+
+@router.patch("/{niche_id}/outcome")
+def update_outcome(niche_id: int, req: OutcomeRequest, db: Session = Depends(get_db)):
+    """Record whether a researched niche actually sold, is testing, or flopped."""
+    VALID = {"testing", "sold", "flopped", "not_listed"}
+    if req.outcome not in VALID:
+        raise HTTPException(status_code=400, detail=f"outcome must be one of: {VALID}")
+    research = db.query(NicheResearch).filter(NicheResearch.niche_id == niche_id).first()
+    if not research:
+        raise HTTPException(status_code=404, detail="No research found for this niche")
+    research.outcome = req.outcome
+    research.outcome_notes = req.notes or None
+    db.commit()
+    db.refresh(research)
+    return {"success": True, "research": research_to_dict(research)}
+

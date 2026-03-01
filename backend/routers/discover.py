@@ -14,6 +14,7 @@ from db.database import get_db
 from db.models import Niche
 from services.generator import generate_pod_niches
 from services.scorer import score_niche
+from services.sub_niche_generator import drill_niche
 
 router = APIRouter(prefix="/discover", tags=["Discover"])
 
@@ -55,6 +56,18 @@ from pydantic import BaseModel
 
 class ScrapeRequest(BaseModel):
     topic: str = "standard"
+
+class DrillRequest(BaseModel):
+    keyword: str
+
+
+@router.post("/drill")
+def drill_niche_endpoint(req: DrillRequest):
+    """Drill a broad niche into 8-10 hyper-specific sub-niches (Groq, free)."""
+    if not req.keyword.strip():
+        raise HTTPException(status_code=400, detail="keyword is required")
+    sub_niches = drill_niche(req.keyword)
+    return {"success": True, "keyword": req.keyword, "sub_niches": sub_niches}
 
 
 @router.post("/scrape")

@@ -55,6 +55,11 @@ class NicheResearch(Base):
     target_audience = Column(Text, nullable=False)
     competitor_insights = Column(Text, nullable=False)
     design_angles = Column(JSON, nullable=False)
+
+    # Feedback loop — did this niche actually sell?
+    # Values: None (not listed) | 'testing' | 'sold' | 'flopped'
+    outcome = Column(String, nullable=True, default=None)
+    outcome_notes = Column(Text, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     

@@ -1,60 +1,78 @@
+"""
+Groq researcher — deep POD niche analysis using llama-3.3-70b-versatile (free).
+Cost: ~$0.00 (free tier). Called only on explicit user action (score >= 7 gate or Event Radar).
+Replaces Anthropic Claude Haiku.
+"""
 import json
-from anthropic import Anthropic
+from groq import Groq
 from config import settings
 
-# Initialize Anthropic client if key is present
-client = Anthropic(api_key=settings.ANTHROPIC_API_KEY) if settings.ANTHROPIC_API_KEY else None
+client = Groq(api_key=settings.AI_API_KEY)
+MODEL = "llama-3.3-70b-versatile"  # free, high-quality reasoning
+
+
+PROMPT = """You are an expert Print-on-Demand (POD) niche researcher specializing in Etsy and Shopify.
+
+Analyze the POD niche: "{keyword}"
+
+Return ONLY valid JSON — no markdown, no explanation outside the JSON object:
+{{
+  "worth_it": <true|false>,
+  "target_audience": "<2-3 sentences: who buys this, their motivation, when they buy>",
+  "competitor_insights": "<2-3 sentences: how saturated the niche is, what top sellers do, what gaps exist>",
+  "design_angles": [
+    "<specific, actionable design concept 1>",
+    "<specific, actionable design concept 2>",
+    "<specific, actionable design concept 3>",
+    "<specific, actionable design concept 4>",
+    "<specific, actionable design concept 5>"
+  ]
+}}
+
+Scoring criteria for worth_it:
+- true: Clear buyer intent, gift or occasion-driven, low-to-medium competition, safe IP, easy to put on a mug/shirt/poster
+- false: Too broad, dominated by big brands, IP risk, no obvious product angle, or digital-only niche
+
+Design angles must be specific and Kittl/POD-ready (e.g. "Funny ICU nurse night shift coffee mug quote", not just "nurse design").
+"""
+
 
 def analyze_niche(keyword: str) -> dict:
-    if not client:
-        return {
-            "worth_it": False,
-            "target_audience": "API Key Missing",
-            "competitor_insights": "Please configure ANTHROPIC_API_KEY in .env",
-            "design_angles": []
-        }
-
-    prompt = f"""
-    You are an expert Print-on-Demand (POD) niche researcher.
-    Analyze the niche: "{keyword}".
-    
-    Provide your response as a raw JSON object with the following schema:
-    {{
-      "worth_it": boolean,
-      "target_audience": "string describing the target audience",
-      "competitor_insights": "string describing competitor landscape",
-      "design_angles": ["idea 1", "idea 2", "idea 3"]
-    }}
-    
-    Return ONLY valid JSON. No markdown formatting, no explanations outside the JSON.
-    """
-    
+    """Deep POD niche analysis via Groq. Returns structured dict."""
     try:
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1000,
-            temperature=0.7,
-            system="You are an expert Print-on-Demand researcher. Output strictly valid JSON.",
+        response = client.chat.completions.create(
+            model=MODEL,
             messages=[
-                {"role": "user", "content": prompt}
-            ]
+                {
+                    "role": "system",
+                    "content": "You are an expert Print-on-Demand niche analyst. Output strictly valid JSON with no markdown formatting."
+                },
+                {
+                    "role": "user",
+                    "content": PROMPT.format(keyword=keyword)
+                }
+            ],
+            temperature=0.6,
+            max_tokens=800,
         )
-        
-        content = response.content[0].text.strip()
-        # Remove markdown code blocks if present
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        return json.loads(content)
-        
+
+        raw = response.choices[0].message.content.strip()
+
+        # Strip markdown code blocks if present
+        if raw.startswith("```json"):
+            raw = raw[7:]
+        if raw.startswith("```"):
+            raw = raw[3:]
+        if raw.endswith("```"):
+            raw = raw[:-3]
+
+        return json.loads(raw.strip())
+
     except Exception as e:
-        print(f"Failed to parse Claude response: {e}")
+        print(f"[Researcher] Failed '{keyword}': {e}")
         return {
             "worth_it": False,
-            "target_audience": "Error analyzing audience.",
-            "competitor_insights": "Error analyzing competitors.",
+            "target_audience": "Analysis failed — please try again.",
+            "competitor_insights": "Analysis failed — please try again.",
             "design_angles": []
         }

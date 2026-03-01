@@ -11,17 +11,19 @@ client = Groq(api_key=settings.AI_API_KEY)
 MODEL = "llama-3.3-70b-versatile"  # Best quality for copywriting
 
 PROMPT = """You are a top-selling Etsy POD seller who specializes in SEO copywriting.
-A seller needs full Etsy + Shopify listing copy for this niche/product.
+A seller needs full listing copy for this niche/product across all platforms.
 
 Niche: "{keyword}"
 Product ideas: {products}
 Design angles: {angles}
 
-Generate optimized listing copy. Etsy SEO rules:
-- Title: 140 chars max, start with the most searched keyword, use | or , as separators, include gift angle
-- Tags: Exactly 13 tags, each max 20 chars, long-tail keywords buyers actually search, NO duplicate words across tags
-- Description: Hook buyers in the first 2 sentences (visible before "read more"), mention: the niche, gifting occasion, customization hint
-- Shopify meta: 155 chars max, include primary keyword, focus on buyer intent
+Generate optimized listing copy. Rules:
+- Etsy Title: 140 chars max, start with the most searched keyword, use | or , as separators, include gift angle
+- Etsy Tags: Exactly 13 tags, each max 20 chars, long-tail keywords buyers actually search, NO duplicate words
+- Etsy Description: Hook buyers in the first 2 sentences (visible before "read more"), mention niche, gifting occasion, customization hint
+- Shopify Meta: 155 chars max, include primary keyword, buyer intent
+- Pinterest Pin: 150-200 chars, visual + aspirational language, 3-5 hashtags at the end, drive click-through
+- Printify Description: 3-4 sentences, focus on product quality + niche fit + gifting use case, suitable for a product listing
 
 Return ONLY valid JSON with this exact shape:
 {{
@@ -29,6 +31,8 @@ Return ONLY valid JSON with this exact shape:
   "etsy_tags": ["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8","tag9","tag10","tag11","tag12","tag13"],
   "etsy_description": "string (2-3 sentence hook, ~200 chars)",
   "shopify_meta": "string (max 155 chars)",
+  "pinterest_description": "string (150-200 chars + hashtags)",
+  "printify_description": "string (3-4 sentences, product + niche fit)",
   "primary_keyword": "string (the #1 search term for this niche)"
 }}
 

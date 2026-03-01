@@ -64,12 +64,12 @@ cd frontend && npm install && npm run dev
 | Key | Provider | Cost | Used for |
 |-----|----------|------|---------|
 | `AI_API_KEY` | Groq | FREE | Niche scoring, Kittl prompt gen, SEO copy |
-| `ANTHROPIC_API_KEY` | Anthropic | ~$0.001/call | Deep niche analysis (Claude Haiku) — explicit user action only |
+| `ANTHROPIC_API_KEY` | Anthropic | ~$0.001/call | Kept in config (unused — research migrated to Groq) |
 | `OPENAI_API_KEY` | OpenAI | ~$0.04/img | DALL-E 3 (backend kept, not in UI) |
 | `GOOGLE_AI_KEY` | Google | Needs billing | Gemini image gen (backend kept, not in UI) |
 | `R2_*` | Cloudflare | ~$0 | Image storage with presigned URLs (7-day TTL) |
 
-**Cost strategy:** Groq is free — use for all text (scoring, prompts, SEO). Only call Claude on explicit user button click. Image generation APIs kept in backend but not shown in UI.
+**Cost strategy:** Groq is free — use for all text (scoring, prompts, SEO, research). Claude key retained in config but not called. Image generation APIs kept in backend but not shown in UI.
 
 ---
 
@@ -92,7 +92,7 @@ novraux-v2/
 │   └── services/
 │       ├── generator.py         # Groq keyword generation
 │       ├── scorer.py            # Groq POD viability scoring (llama-3.1-8b-instant)
-│       ├── researcher.py        # Claude Haiku deep niche analysis
+│       ├── researcher.py        # Groq (llama-3.3-70b) deep niche analysis
 │       ├── prompt_generator.py  # Groq Kittl-ready prompt generation (llama-3.3-70b)
 │       ├── seo_generator.py     # Groq Etsy+Shopify SEO copy (llama-3.3-70b)
 │       ├── image_generator.py   # DALL-E 3 + Gemini (backend only, not in UI)
@@ -126,8 +126,8 @@ novraux-v2/
 | POST | `/discover/scrape` | Groq | free |
 | DELETE | `/discover/{id}` | — | free |
 | GET | `/research/{niche_id}` | DB | free |
-| POST | `/research/{niche_id}` | Claude Haiku | ~$0.001 |
-| POST | `/research/by-keyword` | Claude Haiku | ~$0.001 |
+| POST | `/research/{niche_id}` | Groq (llama-3.3-70b) | free |
+| POST | `/research/by-keyword` | Groq (llama-3.3-70b) | free |
 | POST | `/research/seo` | Groq | free |
 | POST | `/design/prompts` | Groq | free |
 | POST | `/design/generate` | DALL-E / Gemini | ~$0.04 (not in UI) |

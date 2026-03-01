@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     AI_API_KEY: str = ""          # Groq — free, trend scoring
     OPENAI_API_KEY: str = ""      # DALL-E — image generation
     GOOGLE_AI_KEY: str = ""       # Gemini — image generation alternative
-    ANTHROPIC_API_KEY: str = ""   # Claude — deep analysis (gated, score >= 7 only)
+    ANTHROPIC_API_KEY: str = ""   # Claude — kept for future use (research now uses Groq)
 
     # Cloudflare R2 — image storage
     R2_ACCESS_KEY_ID: str = ""

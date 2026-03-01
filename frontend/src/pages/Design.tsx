@@ -1,23 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { api, PromptResult } from '../api'
+import { api, PromptResult, StyleAnalysis } from '../api'
 
 const STYLES: { value: string; label: string; hint: string }[] = [
-  { value: 'auto',       label: 'Auto',        hint: 'AI picks the best style' },
-  { value: 'minimalist', label: 'Minimalist',   hint: 'Flat, clean, 2-3 colors' },
-  { value: 'vintage',    label: 'Vintage',      hint: 'Retro badge, distressed' },
-  { value: 'bold',       label: 'Bold',         hint: 'Chunky type, high contrast' },
-  { value: 'funny',      label: 'Funny',        hint: 'Witty slogan, playful art' },
-  { value: 'handdrawn',  label: 'Hand-drawn',   hint: 'Sketchy, inky, personal' },
+  { value: 'auto', label: 'Auto', hint: 'AI picks the best style' },
+  { value: 'minimalist', label: 'Minimalist', hint: 'Flat, clean, 2-3 colors' },
+  { value: 'vintage', label: 'Vintage', hint: 'Retro badge, distressed' },
+  { value: 'bold', label: 'Bold', hint: 'Chunky type, high contrast' },
+  { value: 'funny', label: 'Funny', hint: 'Witty slogan, playful art' },
+  { value: 'handdrawn', label: 'Hand-drawn', hint: 'Sketchy, inky, personal' },
 ]
 
 const STYLE_BADGE: Record<string, string> = {
   minimalist: 'text-sky-400 bg-sky-950/40 border-sky-900/50',
-  vintage:    'text-amber-400 bg-amber-950/40 border-amber-900/50',
-  bold:       'text-red-400 bg-red-950/40 border-red-900/50',
-  funny:      'text-yellow-400 bg-yellow-950/40 border-yellow-900/50',
-  handdrawn:  'text-emerald-400 bg-emerald-950/40 border-emerald-900/50',
-  mixed:      'text-purple-400 bg-purple-950/40 border-purple-900/50',
+  vintage: 'text-amber-400 bg-amber-950/40 border-amber-900/50',
+  bold: 'text-red-400 bg-red-950/40 border-red-900/50',
+  funny: 'text-yellow-400 bg-yellow-950/40 border-yellow-900/50',
+  handdrawn: 'text-emerald-400 bg-emerald-950/40 border-emerald-900/50',
+  mixed: 'text-purple-400 bg-purple-950/40 border-purple-900/50',
 }
 
 const PRODUCT_ICON: Record<string, string> = {
@@ -26,8 +26,8 @@ const PRODUCT_ICON: Record<string, string> = {
 
 const MODEL_BADGE: Record<string, string> = {
   'Ideogram 3 Quality': 'text-violet-400 bg-violet-950/40 border-violet-900/50',
-  'FLUX 1.1 Pro':       'text-cyan-400 bg-cyan-950/40 border-cyan-900/50',
-  'DALL-E 3':           'text-orange-400 bg-orange-950/40 border-orange-900/50',
+  'FLUX 1.1 Pro': 'text-cyan-400 bg-cyan-950/40 border-cyan-900/50',
+  'DALL-E 3': 'text-orange-400 bg-orange-950/40 border-orange-900/50',
 }
 
 const FOCUS_LABEL: Record<string, string> = {
@@ -41,23 +41,21 @@ const BG_LABEL: Record<string, string> = {
   white: '⬜ White bg',
 }
 
+// ── Copy button ────────────────────────────────────────────────────────────────
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
-
   const copy = async () => {
     await navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
-
   return (
     <button
       onClick={copy}
-      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-        copied
+      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${copied
           ? 'bg-emerald-950/40 border-emerald-900/50 text-emerald-400'
           : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100'
-      }`}
+        }`}
     >
       {copied ? (
         <>
@@ -78,6 +76,7 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
+// ── Prompt card ────────────────────────────────────────────────────────────────
 function PromptCard({ result, index }: { result: PromptResult; index: number }) {
   const styleCls = STYLE_BADGE[result.style] ?? STYLE_BADGE.mixed
   const modelCls = MODEL_BADGE[result.kittl_model] ?? 'text-zinc-400 bg-zinc-900 border-zinc-700'
@@ -85,7 +84,6 @@ function PromptCard({ result, index }: { result: PromptResult; index: number }) 
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl p-5 flex flex-col gap-4 transition-colors">
-      {/* Meta row */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-zinc-600 font-mono text-xs shrink-0">#{index + 1}</span>
         <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${styleCls}`}>
@@ -94,11 +92,7 @@ function PromptCard({ result, index }: { result: PromptResult; index: number }) 
         <span className="text-xs text-zinc-500">{productIcon} {result.product}</span>
         <span className="text-xs text-zinc-600 ml-auto">{BG_LABEL[result.background] ?? result.background}</span>
       </div>
-
-      {/* Prompt text */}
       <p className="text-zinc-300 text-sm leading-relaxed flex-1">{result.prompt}</p>
-
-      {/* Footer: model + copy */}
       <div className="flex items-center justify-between pt-2 border-t border-zinc-800 gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[10px] text-zinc-600">{FOCUS_LABEL[result.focus]}</span>
@@ -113,8 +107,211 @@ function PromptCard({ result, index }: { result: PromptResult; index: number }) 
   )
 }
 
+// ── Style Extractor ────────────────────────────────────────────────────────────
+function StyleExtractor({ onApply }: { onApply: (style: string, keywords: string[]) => void }) {
+  const [open, setOpen] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analysis, setAnalysis] = useState<StyleAnalysis | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const processFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file (JPG, PNG, WEBP)')
+      return
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setError('Image must be under 4MB')
+      return
+    }
+
+    setAnalyzing(true)
+    setError(null)
+    setAnalysis(null)
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const dataUrl = e.target?.result as string
+      // Strip "data:image/jpeg;base64," prefix
+      const b64 = dataUrl.split(',')[1]
+      const mime = file.type
+
+      try {
+        const res = await api.analyzeStyle({ image_b64: b64, mime_type: mime })
+        setAnalysis(res.analysis)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Analysis failed')
+      } finally {
+        setAnalyzing(false)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) processFile(file)
+  }
+
+  const MODEL_BADGE_SMALL: Record<string, string> = {
+    'Ideogram 3 Quality': 'text-violet-400 border-violet-900/50 bg-violet-950/30',
+    'FLUX 1.1 Pro': 'text-cyan-400 border-cyan-900/50 bg-cyan-950/30',
+    'DALL-E 3': 'text-orange-400 border-orange-900/50 bg-orange-950/30',
+  }
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      {/* Header toggle */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-zinc-800/40 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="text-base">🖼️</span>
+          <div className="text-left">
+            <span className="text-sm font-medium text-zinc-200">Reference Image Analyzer</span>
+            <span className="text-zinc-600 text-xs block">Upload a winning design → extract style + keywords</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-900/40 px-1.5 py-0.5 rounded-full font-medium">FREE</span>
+          <svg
+            className={`w-4 h-4 text-zinc-600 transition-transform ${open ? 'rotate-180' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </div>
+      </button>
+
+      {open && (
+        <div className="border-t border-zinc-800 p-5 space-y-4">
+          {/* Drop zone */}
+          <div
+            onDragOver={e => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+            onClick={() => inputRef.current?.click()}
+            className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${dragging
+                ? 'border-indigo-500 bg-indigo-950/20'
+                : 'border-zinc-700 hover:border-zinc-500 bg-zinc-950/40'
+              }`}
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) processFile(f) }}
+            />
+            {analyzing ? (
+              <div className="flex flex-col items-center gap-2">
+                <span className="w-6 h-6 border-2 border-zinc-600 border-t-indigo-500 rounded-full animate-spin" />
+                <p className="text-zinc-500 text-sm">Analyzing with Groq Vision...</p>
+              </div>
+            ) : (
+              <>
+                <div className="text-3xl mb-2">🎨</div>
+                <p className="text-zinc-400 text-sm font-medium">Drop a reference design here</p>
+                <p className="text-zinc-600 text-xs mt-1">or click to browse · JPG, PNG, WEBP · max 4MB</p>
+              </>
+            )}
+          </div>
+
+          {error && (
+            <div className="px-3 py-2 bg-red-950/40 border border-red-900/50 text-red-400 text-xs rounded-lg">
+              {error}
+            </div>
+          )}
+
+          {/* Analysis results */}
+          {analysis && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Style Analysis</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded border font-medium ${MODEL_BADGE_SMALL[analysis.kittl_model] ?? 'text-zinc-400 border-zinc-700'}`}>
+                  Kittl: {analysis.kittl_model}
+                </span>
+              </div>
+
+              {/* Style tags */}
+              <div>
+                <p className="text-[11px] text-zinc-600 mb-1.5 uppercase tracking-wider font-semibold">Style Tags</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {analysis.style_tags.map((tag, i) => (
+                    <span key={i} className="text-xs px-2.5 py-1 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-full">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Color palette */}
+              <div>
+                <p className="text-[11px] text-zinc-600 mb-1.5 uppercase tracking-wider font-semibold">Color Palette</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {analysis.color_palette.map((color, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <div
+                        className="w-4 h-4 rounded border border-zinc-700 shrink-0"
+                        style={{ backgroundColor: color.startsWith('#') ? color : undefined }}
+                      />
+                      <span className="text-xs text-zinc-400">{color}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Keywords */}
+              <div>
+                <p className="text-[11px] text-zinc-600 mb-1.5 uppercase tracking-wider font-semibold">Extracted Keywords</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {analysis.keywords.map((kw, i) => (
+                    <span key={i} className="text-xs px-2.5 py-1 bg-indigo-950/40 border border-indigo-900/40 text-indigo-300 rounded-full">
+                      {kw}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Replication prompt */}
+              <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] text-zinc-500 uppercase tracking-wider font-semibold">Kittl Replication Prompt</p>
+                  <CopyButton text={analysis.replication_prompt} />
+                </div>
+                <p className="text-sm text-zinc-300 leading-relaxed">{analysis.replication_prompt}</p>
+              </div>
+
+              {/* Apply button */}
+              <button
+                onClick={() => {
+                  // Map mood to closest style value
+                  const moodToStyle: Record<string, string> = {
+                    funny: 'funny', bold: 'bold', minimal: 'minimalist',
+                    vintage: 'vintage', playful: 'funny', inspirational: 'handdrawn'
+                  }
+                  const style = moodToStyle[analysis.mood] ?? 'auto'
+                  onApply(style, analysis.keywords)
+                }}
+                className="w-full py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-600/40 text-indigo-300 text-sm font-medium rounded-lg transition-colors"
+              >
+                ✦ Apply Style to Prompt Generator
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Design page ────────────────────────────────────────────────────────────────
 export function Design() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
 
   const nicheFromUrl = searchParams.get('niche') ?? ''
@@ -125,13 +322,14 @@ export function Design() {
   const [error, setError] = useState<string | null>(null)
   const [prompts, setPrompts] = useState<PromptResult[]>([])
   const [hasGenerated, setHasGenerated] = useState(false)
+  const [extractedKeywords, setExtractedKeywords] = useState<string[]>([])
 
   // Auto-generate when arriving with both niche and angle from Research
   useEffect(() => {
     if (nicheFromUrl && angleFromUrl) {
       runGenerate()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const runGenerate = async () => {
@@ -150,6 +348,17 @@ export function Design() {
       setError(e instanceof Error ? e.message : 'Generation failed')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const handleStyleApply = (detectedStyle: string, keywords: string[]) => {
+    setStyle(detectedStyle)
+    setExtractedKeywords(keywords)
+    // If no niche yet, pre-fill with first keyword
+    if (!nicheFromUrl && keywords.length > 0) {
+      const params = new URLSearchParams(searchParams)
+      params.set('niche', keywords[0])
+      setSearchParams(params)
     }
   }
 
@@ -175,7 +384,33 @@ export function Design() {
         )}
       </div>
 
-      {/* How it works banner — shown only before first generation */}
+      {/* Style Extractor — always available */}
+      <div className="mb-6">
+        <StyleExtractor onApply={handleStyleApply} />
+      </div>
+
+      {/* Extracted keywords from style analysis */}
+      {extractedKeywords.length > 0 && (
+        <div className="mb-4 px-4 py-3 bg-indigo-950/20 border border-indigo-900/30 rounded-xl flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-indigo-400 font-medium shrink-0">🎨 Extracted from image:</span>
+          {extractedKeywords.map((kw, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                const params = new URLSearchParams(searchParams)
+                params.set('niche', kw)
+                setSearchParams(params)
+              }}
+              className="text-xs px-2.5 py-1 bg-indigo-950/40 border border-indigo-900/50 text-indigo-300 hover:bg-indigo-900/40 rounded-full transition-colors"
+            >
+              {kw}
+            </button>
+          ))}
+          <span className="text-zinc-600 text-xs">← click to use as niche</span>
+        </div>
+      )}
+
+      {/* How it works banner */}
       {!hasGenerated && nicheFromUrl && (
         <div className="mb-6 flex items-start gap-3 px-4 py-3 bg-indigo-950/20 border border-indigo-900/30 rounded-xl text-xs text-zinc-400">
           <span className="text-indigo-400 text-base shrink-0">ℹ️</span>
@@ -220,11 +455,10 @@ export function Design() {
               <button
                 key={s.value}
                 onClick={() => setStyle(s.value)}
-                className={`px-3 py-2 rounded-lg text-xs border transition-colors text-left ${
-                  style === s.value
+                className={`px-3 py-2 rounded-lg text-xs border transition-colors text-left ${style === s.value
                     ? 'bg-indigo-600/20 border-indigo-600/60 text-indigo-300'
                     : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                }`}
+                  }`}
               >
                 <span className="font-medium block">{s.label}</span>
                 <span className="text-zinc-600">{s.hint}</span>
