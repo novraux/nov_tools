@@ -29,8 +29,8 @@ Write ONE detailed Kittl AI prompt that describes a SPECIFIC, CONCRETE graphic d
 - The EXACT hero text/slogan in quotes
 - Art style (vintage stamp, retro badge, hand-lettered, minimal line art, etc.)
 - 3-4 specific colors (e.g. "mustard yellow, matte black, cream white")
-- Texture (distressed, clean, halftone dots, worn edges, etc.)
-- End with: "transparent background" or "white background"
+- Texture (keep it clean and pristine. Do NOT add distressed, worn, or grunge textures)
+- CRITICAL: Do NOT mention any background in the prompt (do not ask for transparent, white, or black). Just describe the graphic itself.
 
 CRITICAL: Do NOT mention any product (no "t-shirt", "mug", "poster" etc.).
 Describe ONLY the graphic artwork itself. 2-4 sentences max.
@@ -47,7 +47,7 @@ Examples of good audiences: "ICU Nurse", "Kindergarten Teacher", "Plant Mom",
 ═══ STEP 3: 10 VARIANT PROMPTS ═══
 Take the EXACT same visual design from Step 1 — same layout, style, colors, texture.
 ONLY change the text/slogan to target each audience from Step 2.
-Do NOT mention any product in the prompt. End with "transparent background" or "white background".
+Do NOT mention any product or background in the prompt. Just output the artwork description.
 Each variant: 2-3 sentences max.
 
 ═══ OUTPUT FORMAT ═══
@@ -62,7 +62,6 @@ Return ONLY this JSON — no markdown:
       "style": "minimalist|vintage|bold|funny|handdrawn",
       "product": "{product}",
       "focus": "text|illustration|mixed",
-      "background": "transparent|white",
       "kittl_model": "Ideogram 3 Quality|FLUX 1.1 Pro|DALL-E 3"
     }},
     ...10 items

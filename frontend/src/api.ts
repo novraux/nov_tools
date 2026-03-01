@@ -1,5 +1,10 @@
 const BASE = 'http://localhost:8001'
 
+export interface NicheHistory {
+  avg_interest: number
+  recorded_at: string
+}
+
 export interface Niche {
   id: number
   keyword: string
@@ -13,6 +18,7 @@ export interface Niche {
   reasoning: string
   product_ideas: string[]
   scraped_at: string | null
+  history?: NicheHistory[]
 }
 
 export interface Design {
@@ -139,10 +145,14 @@ export const api = {
     request<{ success: boolean }>(`/discover/${id}`, { method: 'DELETE' }),
 
   drillNiche: (keyword: string) =>
-    request<{ success: boolean; keyword: string; sub_niches: SubNiche[] }>('/discover/drill', {
+    request<{ success: boolean; keyword: string; sub_niches: any[] }>('/discover/drill', {
       method: 'POST',
       body: JSON.stringify({ keyword }),
     }),
+
+  getResearchProfile: () =>
+    request<{ success: boolean; profile_keywords: string[] }>('/research/profile'),
+
 
   getResearch: (nicheId: number) =>
     request<{ success: boolean; research: NicheResearch | null }>(`/research/${nicheId}`),

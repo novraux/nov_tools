@@ -31,6 +31,18 @@ class Niche(Base):
     archived = Column(Boolean, default=False)
     
     research = relationship("NicheResearch", back_populates="niche", uselist=False)
+    history = relationship("NicheHistory", back_populates="niche", cascade="all, delete-orphan")
+
+
+class NicheHistory(Base):
+    __tablename__ = "niche_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    niche_id = Column(Integer, ForeignKey("niches.id"), index=True, nullable=False)
+    avg_interest = Column(Integer, nullable=False)
+    recorded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    niche = relationship("Niche", back_populates="history")
 
 class Design(Base):
     __tablename__ = "designs"

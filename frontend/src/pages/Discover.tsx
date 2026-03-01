@@ -116,7 +116,7 @@ const PRODUCT_ICON: Record<string, string> = {
   mug: '☕', 't-shirt': '👕', 'tote bag': '🛍️', poster: '🖼️', hoodie: '🧥',
 }
 
-function DrillPanel({ keyword, onClose }: { keyword: string; onClose: () => void }) {
+function DrillPanel({ keyword, onClose, profileKeywords }: { keyword: string; onClose: () => void; profileKeywords: string[] }) {
   const [loading, setLoading] = useState(true)
   const [subNiches, setSubNiches] = useState<SubNiche[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -183,6 +183,15 @@ function DrillPanel({ keyword, onClose }: { keyword: string; onClose: () => void
                       {sn.competition} comp.
                     </span>
                     <span className="text-[10px] text-zinc-600">{icon} {sn.product_fit}</span>
+                    {profileKeywords.some(pk => {
+                      const pkLower = pk.toLowerCase()
+                      const snLower = sn.keyword.toLowerCase()
+                      return pkLower.includes(snLower) || snLower.includes(pkLower)
+                    }) && (
+                        <span className="text-[10px] text-orange-400 border border-orange-900/50 bg-orange-950/20 px-1.5 py-0.5 rounded-full" title="You already researched a similar niche — warning: cannibalization risk">
+                          ⚠️ Overlap
+                        </span>
+                      )}
                   </div>
                   {sn.hook && (
                     <p className="text-zinc-600 text-[11px] mt-1 leading-snug">{sn.hook}</p>
@@ -208,9 +217,10 @@ interface NicheCardProps {
   niche: Niche
   onResearch: () => void
   onArchive: () => void
+  profileKeywords: string[]
 }
 
-function NicheCard({ niche, onResearch, onArchive }: NicheCardProps) {
+function NicheCard({ niche, onResearch, onArchive, profileKeywords }: NicheCardProps) {
   const [drillOpen, setDrillOpen] = useState(false)
 
   const score = niche.score ?? 0
@@ -230,6 +240,20 @@ function NicheCard({ niche, onResearch, onArchive }: NicheCardProps) {
     niche.competition === 'low' ? 'text-emerald-400' :
       niche.competition === 'high' ? 'text-red-400' :
         'text-amber-400'
+
+  let decayWarning: string | null = null
+  if (niche.history && niche.history.length >= 2) {
+    const sortedHistory = [...niche.history].sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime())
+    const maxEntry = sortedHistory.reduce((prev, current) => (prev.avg_interest > current.avg_interest) ? prev : current)
+    const latestEntry = sortedHistory[sortedHistory.length - 1]
+
+    // Warn if peak was > 30 interest, but we've dropped by 30%+ since peak
+    if (maxEntry.avg_interest > 30 && latestEntry.avg_interest < maxEntry.avg_interest * 0.7) {
+      const msDiff = new Date().getTime() - new Date(maxEntry.recorded_at).getTime()
+      const weeksAgo = Math.max(1, Math.round(msDiff / (1000 * 60 * 60 * 24 * 7)))
+      decayWarning = `⚠️ Peak: ${weeksAgo}w ago`
+    }
+  }
 
   return (
     <div className="group bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl p-5 flex flex-col gap-3 transition-colors">
@@ -252,6 +276,11 @@ function NicheCard({ niche, onResearch, onArchive }: NicheCardProps) {
         <span className={`text-xs ${compColor} capitalize`}>
           {niche.competition ?? '—'} comp.
         </span>
+        {decayWarning && (
+          <span className="text-[10px] text-red-400 font-medium px-2 py-0.5 rounded-full border border-red-900/50 bg-red-950/20" title="Interest has decayed significantly since peak">
+            {decayWarning}
+          </span>
+        )}
       </div>
 
       {/* Product ideas */}
@@ -308,7 +337,7 @@ function NicheCard({ niche, onResearch, onArchive }: NicheCardProps) {
 
       {/* Drill panel — only mounts when open */}
       {drillOpen && (
-        <DrillPanel keyword={niche.keyword} onClose={() => setDrillOpen(false)} />
+        <DrillPanel keyword={niche.keyword} onClose={() => setDrillOpen(false)} profileKeywords={profileKeywords} />
       )}
     </div>
   )
@@ -327,7 +356,12 @@ export function Discover() {
   const [filterScore, setFilterScore] = useState(false)
   const [filterRising, setFilterRising] = useState(false)
   const [filterLowComp, setFilterLowComp] = useState(false)
+  const [profileKeywords, setProfileKeywords] = useState<string[]>([])
   const navigate = useNavigate()
+
+  useEffect(() => {
+    api.getResearchProfile().then(d => setProfileKeywords(d.profile_keywords || [])).catch(() => { })
+  }, [])
 
 
   const load = useCallback(async () => {
@@ -470,12 +504,13 @@ export function Discover() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {niches.map(niche => (
+          {niches.map(n => (
             <NicheCard
-              key={niche.id}
-              niche={niche}
-              onResearch={() => navigate(`/research?id=${niche.id}&niche=${encodeURIComponent(niche.keyword)}`)}
-              onArchive={() => archiveNiche(niche.id)}
+              key={n.id}
+              niche={n}
+              onResearch={() => navigate(`/research?niche=${encodeURIComponent(n.keyword)}`)}
+              onArchive={() => archiveNiche(n.id)}
+              profileKeywords={profileKeywords}
             />
           ))}
         </div>

@@ -11,7 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from db.database import get_db
-from db.models import Niche
+from db.models import Niche, NicheHistory
+from sqlalchemy.orm import joinedload
 from services.generator import generate_pod_niches
 from services.scorer import score_niche
 from services.sub_niche_generator import drill_niche
@@ -35,6 +36,10 @@ def niche_to_dict(n: Niche) -> dict:
         "reasoning": n.reasoning,
         "product_ideas": n.product_ideas or [],
         "scraped_at": n.scraped_at.isoformat() if n.scraped_at else None,
+        "history": [
+            {"avg_interest": h.avg_interest, "recorded_at": h.recorded_at.isoformat()} 
+            for h in sorted(n.history, key=lambda x: x.recorded_at)
+        ] if hasattr(n, 'history') else []
     }
 
 
@@ -46,6 +51,7 @@ def list_niches(db: Session = Depends(get_db)):
     niches = (
         db.query(Niche)
         .filter(Niche.archived == False)  # noqa: E712
+        .options(joinedload(Niche.history))
         .order_by(Niche.score.desc().nullslast())
         .all()
     )
@@ -105,8 +111,7 @@ def run_scrape(req: ScrapeRequest, db: Session = Depends(get_db)):
             existing.product_ideas = scored.get("product_ideas", [])
             existing.scraped_at = now
             updated += 1
-        else:
-            db.add(Niche(
+            new_niche = Niche(
                 keyword=kw,
                 source=item.get("source"),
                 score=scored["score"],
@@ -118,8 +123,19 @@ def run_scrape(req: ScrapeRequest, db: Session = Depends(get_db)):
                 reasoning=scored.get("reasoning"),
                 product_ideas=scored.get("product_ideas", []),
                 scraped_at=now,
-            ))
+            )
+            db.add(new_niche)
             saved += 1
+            niche_obj = new_niche
+
+        db.flush()  # populate niche_obj.id if new
+        
+        if item.get("avg_interest") is not None:
+            db.add(NicheHistory(
+                niche_id=niche_obj.id,
+                avg_interest=item["avg_interest"],
+                recorded_at=now
+            ))
 
         db.commit()
 

@@ -48,7 +48,7 @@ For each prompt, write ONE descriptive paragraph (2-4 sentences) in natural Engl
 2. Any slogan or text — write the EXACT words in quotes
 3. Art style — be precise (e.g., "bold retro badge illustration", "minimal line art", "hand-lettered watercolor")
 4. Color palette — 2-4 specific colors or mood (e.g., "dusty pink and sage green", "black and gold")
-5. End with: product + background ("transparent background, centered, suitable for direct-to-garment t-shirt printing" OR "white background, centered, suitable for sublimation mug printing")
+5. CRITICAL: Do NOT mention any background in the prompt (do not ask for transparent, white, or black). Just describe the design itself.
 
 Also set:
 - "product": what it's best for (t-shirt, mug, tote bag, hoodie, poster, sweatshirt)
@@ -62,7 +62,7 @@ The kittl_model field should be automatically determined:
 - "mixed" focus → "DALL-E 3"
 
 Return ONLY a JSON array. Each element must have exactly these keys:
-{{"prompt": "...", "style": "...", "product": "...", "focus": "text|illustration|mixed", "background": "transparent|white", "kittl_model": "..."}}
+{{"prompt": "...", "style": "...", "product": "...", "focus": "text|illustration|mixed", "kittl_model": "..."}}
 
 No markdown, no explanation — raw JSON array only."""
 

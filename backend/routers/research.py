@@ -97,6 +97,20 @@ def run_keyword_research(req: KeywordResearchRequest):
     }
 
 
+@router.get("/profile")
+def get_research_profile(db: Session = Depends(get_db)):
+    """Get a list of all niche keywords the user has researched (has a NicheResearch entry)."""
+    # Join Niche and NicheResearch to get the actual keywords
+    researched = (
+        db.query(Niche.keyword)
+        .join(NicheResearch, Niche.id == NicheResearch.niche_id)
+        .all()
+    )
+    # Extract strings from the result tuples
+    keywords = [r[0] for r in researched]
+    return {"success": True, "profile_keywords": keywords}
+
+
 @router.get("/{niche_id}")
 def get_niche_research(niche_id: int, db: Session = Depends(get_db)):
     research = db.query(NicheResearch).filter(NicheResearch.niche_id == niche_id).first()

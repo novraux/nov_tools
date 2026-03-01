@@ -227,8 +227,6 @@ function KittlFlowsPanel({ niche, angle, product }: { niche: string; angle: stri
                 <span className="text-[9px] text-zinc-600 capitalize">{f.style}</span>
                 <span className="text-zinc-800">·</span>
                 <span className="text-[9px] text-zinc-600 capitalize">{f.product}</span>
-                <span className="text-zinc-800">·</span>
-                <span className="text-[9px] text-zinc-600">{f.background} bg</span>
               </div>
             </div>
           )

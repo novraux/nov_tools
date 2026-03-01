@@ -1,42 +1,43 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { getUpcomingEvents, EventCategory, PodPotential } from '../lib/holidays'
+import { api } from '../api'
 
 const CATEGORIES: { value: EventCategory | 'all'; label: string }[] = [
-  { value: 'all',       label: 'All' },
-  { value: 'holiday',   label: 'Holidays' },
+  { value: 'all', label: 'All' },
+  { value: 'holiday', label: 'Holidays' },
   { value: 'awareness', label: 'Awareness' },
-  { value: 'seasonal',  label: 'Seasonal' },
-  { value: 'shopping',  label: 'Shopping' },
-  { value: 'sports',    label: 'Sports' },
-  { value: 'cultural',  label: 'Cultural' },
+  { value: 'seasonal', label: 'Seasonal' },
+  { value: 'shopping', label: 'Shopping' },
+  { value: 'sports', label: 'Sports' },
+  { value: 'cultural', label: 'Cultural' },
 ]
 
 const TIME_FILTERS: { value: number | null; label: string }[] = [
   { value: null, label: 'All' },
-  { value: 30,  label: '30d' },
-  { value: 60,  label: '60d' },
-  { value: 90,  label: '90d' },
+  { value: 30, label: '30d' },
+  { value: 60, label: '60d' },
+  { value: 90, label: '90d' },
   { value: 180, label: '180d' },
 ]
 
 const POD_COLORS: Record<PodPotential, string> = {
-  high:   'text-emerald-400 bg-emerald-950/50 border-emerald-900/50',
+  high: 'text-emerald-400 bg-emerald-950/50 border-emerald-900/50',
   medium: 'text-amber-400 bg-amber-950/50 border-amber-900/50',
-  low:    'text-zinc-500 bg-zinc-900 border-zinc-800',
+  low: 'text-zinc-500 bg-zinc-900 border-zinc-800',
 }
 
 const COMPETITION_COLORS: Record<string, string> = {
-  low:    'text-emerald-400',
+  low: 'text-emerald-400',
   medium: 'text-amber-400',
-  high:   'text-red-400',
+  high: 'text-red-400',
 }
 
 const PREP_CONFIG = {
-  urgent:  { label: 'Act Now',   cls: 'text-red-400 bg-red-950/50 border-red-900/50',     dot: 'bg-red-400' },
-  watch:   { label: 'Prep Soon', cls: 'text-amber-400 bg-amber-950/50 border-amber-900/50', dot: 'bg-amber-400' },
-  ontrack: { label: 'On Track',  cls: 'text-zinc-500 bg-zinc-900 border-zinc-800',         dot: 'bg-zinc-600' },
+  urgent: { label: 'Act Now', cls: 'text-red-400 bg-red-950/50 border-red-900/50', dot: 'bg-red-400' },
+  watch: { label: 'Prep Soon', cls: 'text-amber-400 bg-amber-950/50 border-amber-900/50', dot: 'bg-amber-400' },
+  ontrack: { label: 'On Track', cls: 'text-zinc-500 bg-zinc-900 border-zinc-800', dot: 'bg-zinc-600' },
 }
 
 export function Holidays() {
@@ -44,24 +45,48 @@ export function Holidays() {
   const [category, setCategory] = useState<EventCategory | 'all'>('all')
   const [days, setDays] = useState<number | null>(null)
   const [highOnly, setHighOnly] = useState(false)
+  const [forYou, setForYou] = useState(false)
+  const [profileKeywords, setProfileKeywords] = useState<string[]>([])
+
+  useEffect(() => {
+    api.getResearchProfile().then(d => setProfileKeywords(d.profile_keywords || [])).catch(() => { })
+  }, [])
 
   const allEvents = useMemo(() => getUpcomingEvents(), [])
 
   const filtered = useMemo(() => {
-    return allEvents.filter(e => {
+    let result = allEvents.filter(e => {
       if (category !== 'all' && e.category !== category) return false
       if (days !== null && e.daysLeft > days) return false
       if (highOnly && e.podPotential !== 'high') return false
       return true
     })
-  }, [allEvents, category, days, highOnly])
+
+    if (forYou && profileKeywords.length > 0) {
+      const scored = result.map(e => {
+        let score = 0
+        const eventText = e.topNiches.join(' ').toLowerCase()
+        const eventName = e.name.toLowerCase()
+        profileKeywords.forEach(pk => {
+          const w = pk.toLowerCase()
+          if (eventText.includes(w)) score += 2
+          if (eventName.includes(w)) score += 3
+        })
+        return { event: e, score }
+      })
+      scored.sort((a, b) => b.score - a.score)
+      return scored.map(s => s.event)
+    }
+
+    return result
+  }, [allEvents, category, days, highOnly, forYou, profileKeywords])
 
   // Stats (always from unfiltered)
   const stats = useMemo(() => ({
-    total:   allEvents.length,
+    total: allEvents.length,
     highPod: allEvents.filter(e => e.podPotential === 'high').length,
-    month:   allEvents.filter(e => e.daysLeft <= 30).length,
-    urgent:  allEvents.filter(e => e.prepStatus === 'urgent').length,
+    month: allEvents.filter(e => e.daysLeft <= 30).length,
+    urgent: allEvents.filter(e => e.prepStatus === 'urgent').length,
   }), [allEvents])
 
   return (
@@ -83,10 +108,10 @@ export function Holidays() {
       {/* Stats bar */}
       <div className="grid grid-cols-4 gap-3 mb-7">
         {[
-          { label: 'Total Events',  value: stats.total,   color: 'text-zinc-100' },
-          { label: '🔥 High POD',   value: stats.highPod, color: 'text-emerald-400' },
-          { label: 'Next 30 Days',  value: stats.month,   color: 'text-indigo-400' },
-          { label: '🚨 Act Now',    value: stats.urgent,  color: 'text-red-400' },
+          { label: 'Total Events', value: stats.total, color: 'text-zinc-100' },
+          { label: '🔥 High POD', value: stats.highPod, color: 'text-emerald-400' },
+          { label: 'Next 30 Days', value: stats.month, color: 'text-indigo-400' },
+          { label: '🚨 Act Now', value: stats.urgent, color: 'text-red-400' },
         ].map(s => (
           <div key={s.label} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
             <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
@@ -103,11 +128,10 @@ export function Holidays() {
             <button
               key={c.value}
               onClick={() => setCategory(c.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                category === c.value
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${category === c.value
                   ? 'bg-indigo-600/20 border-indigo-600/50 text-indigo-300'
                   : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-300'
-              }`}
+                }`}
             >
               {c.label}
             </button>
@@ -122,11 +146,10 @@ export function Holidays() {
             <button
               key={String(t.value)}
               onClick={() => setDays(t.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                days === t.value
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${days === t.value
                   ? 'bg-zinc-700 border-zinc-600 text-zinc-100'
                   : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400'
-              }`}
+                }`}
             >
               {t.label}
             </button>
@@ -138,13 +161,24 @@ export function Holidays() {
         {/* High POD toggle */}
         <button
           onClick={() => setHighOnly(v => !v)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-            highOnly
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${highOnly
               ? 'bg-emerald-950/40 border-emerald-900/50 text-emerald-400'
               : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400'
-          }`}
+            }`}
         >
           🔥 High POD only
+        </button>
+
+        {/* For You toggle */}
+        <button
+          onClick={() => setForYou(v => !v)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${forYou
+              ? 'bg-purple-950/40 border-purple-900/50 text-purple-400'
+              : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400'
+            }`}
+          title="Sort by matching your researched niches"
+        >
+          ✨ For You
         </button>
 
         <span className="ml-auto text-xs text-zinc-600">{filtered.length} events</span>
